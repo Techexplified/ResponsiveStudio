@@ -1,0 +1,9 @@
+{
+  "extends": "@create-figma-plugin/tsconfig",
+  "compilerOptions": {
+    "types": ["@figma/plugin-typings"],
+    "skipLibCheck": true,
+    
+  },
+  "include": ["src"]
+}
