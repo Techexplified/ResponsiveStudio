@@ -8,6 +8,8 @@ import type {
 } from "./frameSchema"
 
 type ImportableFrameNode = FrameNode | ComponentNode | InstanceNode
+type GeneratedFrameNode = FrameNode | ComponentNode | InstanceNode
+type GenerationPayload = Extract<UiToPluginMessage, { type: "generate-responsive-frame" }>["payload"]
 type Bounds = {
   x: number
   y: number
@@ -32,7 +34,10 @@ export default function () {
     }
 
     if (message.type === "generate-responsive-frame") {
-      figma.notify("Responsive generation is not wired up yet.")
+      generateResponsiveFrame(message.payload).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : "Could not generate responsive frame."
+        figma.notify(message)
+      })
     }
   }
 }
@@ -70,6 +75,167 @@ function importSelectedFrame() {
   })
 
   figma.notify(`Imported "${selectedNode.name}"`)
+}
+
+async function generateResponsiveFrame(payload: GenerationPayload) {
+  const [selectedNode] = figma.currentPage.selection
+
+  if (selectedNode == null || !isImportableFrameNode(selectedNode)) {
+    figma.notify("Select the source frame, component, or instance before generating.")
+    return
+  }
+
+  const sourceWidth = Math.max(1, selectedNode.width)
+  const generatedNode = selectedNode.clone()
+  generatedNode.name = `${selectedNode.name} / ${getDeviceLabel(payload.targetDevice)}`
+  generatedNode.x = selectedNode.x + selectedNode.width + 80
+  generatedNode.y = selectedNode.y
+
+  if (canResize(generatedNode)) {
+    generatedNode.resize(
+      clampNumber(payload.screenWidth, 240, 1920),
+      Math.max(1, generatedNode.height)
+    )
+  }
+
+  await applyResponsiveRules(generatedNode, payload, sourceWidth)
+
+  figma.currentPage.selection = [generatedNode]
+  figma.viewport.scrollAndZoomIntoView([generatedNode])
+  figma.notify(`Generated ${Math.round(payload.screenWidth)}px responsive frame.`)
+}
+
+async function applyResponsiveRules(node: SceneNode, payload: GenerationPayload, sourceWidth: number) {
+  if (hasAutoLayout(node)) {
+    const shouldStack = shouldStackLayer(node, payload)
+
+    if (shouldStack) {
+      node.layoutMode = "VERTICAL"
+      node.itemSpacing = clampNumber(payload.layoutRules.stackGap, 0, 200)
+      node.counterAxisAlignItems = getFigmaCounterAxisAlignment(payload.layoutRules.stackAlignment)
+      applyStackChildAlignment(node, payload.layoutRules.stackAlignment)
+    }
+
+    if (isRootResponsiveNode(node)) {
+      const padding = clampNumber(payload.layoutRules.outputPadding, 0, 200)
+      node.paddingTop = padding
+      node.paddingRight = padding
+      node.paddingBottom = padding
+      node.paddingLeft = padding
+    }
+  }
+
+  if (node.type === "TEXT") {
+    await applyResponsiveTextRules(node, payload, sourceWidth)
+  }
+
+  if (hasChildren(node)) {
+    for (const child of node.children) {
+      await applyResponsiveRules(child, payload, sourceWidth)
+    }
+  }
+}
+
+async function applyResponsiveTextRules(node: TextNode, payload: GenerationPayload, sourceWidth: number) {
+  if (typeof node.fontSize !== "number") {
+    return
+  }
+
+  await loadTextFonts(node)
+
+  const widthScale = clampNumber(payload.screenWidth / sourceWidth, 0.5, 1)
+  const scaledSize = node.fontSize * widthScale
+  const minimumTextSize = clampNumber(payload.layoutRules.minimumTextSize, 8, 48)
+
+  if (payload.layoutRules.textScaleMode === "scale") {
+    node.fontSize = Math.max(minimumTextSize, scaledSize)
+  } else if (payload.layoutRules.textScaleMode === "clamp") {
+    node.fontSize = Math.max(minimumTextSize, Math.min(node.fontSize, scaledSize))
+  }
+
+  if (payload.layoutRules.tightenLineHeight && node.lineHeight !== figma.mixed) {
+    node.lineHeight = {
+      unit: "PERCENT",
+      value: 115
+    }
+  }
+}
+
+async function loadTextFonts(node: TextNode) {
+  if (node.fontName !== figma.mixed) {
+    await figma.loadFontAsync(node.fontName)
+  }
+}
+
+function shouldStackLayer(node: SceneNode, payload: GenerationPayload): boolean {
+  if (!hasAutoLayout(node) || node.layoutMode !== "HORIZONTAL") {
+    return false
+  }
+
+  if (payload.layoutRules.rowToColumnMode === "always") {
+    return true
+  }
+
+  if (payload.layoutRules.rowToColumnMode === "never") {
+    return false
+  }
+
+  return payload.screenWidth <= payload.layoutRules.rowToColumnBreakpoint
+}
+
+function getFigmaCounterAxisAlignment(
+  alignment: GenerationPayload["layoutRules"]["stackAlignment"]
+): "MIN" | "CENTER" | "MAX" {
+  if (alignment === "center") {
+    return "CENTER"
+  }
+
+  return "MIN"
+}
+
+function applyStackChildAlignment(
+  node: SceneNode & AutoLayoutMixin,
+  alignment: GenerationPayload["layoutRules"]["stackAlignment"]
+) {
+  if (!hasChildren(node)) {
+    return
+  }
+
+  for (const child of node.children) {
+    if (!("layoutAlign" in child)) {
+      continue
+    }
+
+    child.layoutAlign = alignment === "stretch" ? "STRETCH" : "INHERIT"
+  }
+}
+
+function isRootResponsiveNode(node: SceneNode): node is GeneratedFrameNode {
+  return isImportableFrameNode(node) && node.parent === figma.currentPage
+}
+
+function hasAutoLayout(node: SceneNode): node is SceneNode & AutoLayoutMixin {
+  return "layoutMode" in node
+}
+
+function canResize(node: SceneNode): node is SceneNode & LayoutMixin {
+  return "resize" in node && typeof node.resize === "function"
+}
+
+function getDeviceLabel(targetDevice: GenerationPayload["targetDevice"]): string {
+  if (targetDevice === "mobile") {
+    return "Mobile"
+  }
+
+  if (targetDevice === "tablet") {
+    return "Tablet"
+  }
+
+  if (targetDevice === "desktop") {
+    return "Desktop"
+  }
+
+  return "Custom"
 }
 
 function serializeFrame(node: ImportableFrameNode): FigmaSerializedFrame {
@@ -369,6 +535,14 @@ function toPercent(value: number, total: number): number {
 
 function roundLayoutNumber(value: number): number {
   return Math.round(value * 1000) / 1000
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min
+  }
+
+  return Math.min(max, Math.max(min, value))
 }
 
 function toJsonValue(value: unknown): FigmaJsonValue {

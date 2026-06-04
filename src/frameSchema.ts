@@ -99,6 +99,12 @@ export type FigmaSerializedNode = {
       bottom: number
       left: number
     }
+    margin?: {
+      top: number
+      right: number
+      bottom: number
+      left: number
+    }
     primaryAxisSizingMode?: string
     counterAxisSizingMode?: string
   }
@@ -149,6 +155,16 @@ export type UiToPluginMessage =
       payload: {
         targetDevice: "mobile" | "tablet" | "desktop" | "custom"
         screenWidth: number
+        layoutRules: {
+          rowToColumnMode: "auto" | "always" | "never"
+          rowToColumnBreakpoint: number
+          stackGap: number
+          outputPadding: number
+          stackAlignment: "start" | "center" | "stretch"
+          textScaleMode: "preserve" | "scale" | "clamp"
+          minimumTextSize: number
+          tightenLineHeight: boolean
+        }
         options: Array<{
           id: string
           label: string

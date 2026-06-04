@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks"
 import { h } from "preact"
+import LayoutRules, { type LayoutRulesState } from "./LayoutRules"
 import type { FigmaSerializedFrame } from "../frameSchema"
 
 
@@ -15,6 +16,7 @@ type ConversionOption = {
 export type ResponsiveGenerationSettings = {
   targetDevice: TargetDevice
   screenWidth: number
+  layoutRules: LayoutRulesState
   options: ConversionOption[]
 }
 
@@ -24,8 +26,10 @@ export default function ResponsiveSidebar({
   importError,
   targetDevice,
   screenWidth,
+  layoutRules,
   onTargetDeviceChange,
   onScreenWidthChange,
+  onLayoutRulesChange,
   onClearFrame,
   onGenerate
 }: {
@@ -33,8 +37,10 @@ export default function ResponsiveSidebar({
   importError: string
   targetDevice: TargetDevice
   screenWidth: string
+  layoutRules: LayoutRulesState
   onTargetDeviceChange: (value: TargetDevice) => void
   onScreenWidthChange: (value: string) => void
+  onLayoutRulesChange: (value: LayoutRulesState) => void
   onClearFrame: () => void
   onGenerate: (settings: ResponsiveGenerationSettings) => void
 }) {
@@ -64,7 +70,6 @@ export default function ResponsiveSidebar({
       enabled: true
     }
   ])
-
   function toggleOption(id: string) {
     setOptions((current) =>
       current.map((option) =>
@@ -93,6 +98,7 @@ export default function ResponsiveSidebar({
     const payload = {
       targetDevice,
       screenWidth: Number(screenWidth),
+      layoutRules,
       options
     }
 
@@ -135,7 +141,14 @@ export default function ResponsiveSidebar({
           onChange={onScreenWidthChange}
         />
 
-        {/* <StepTitle index={3} title="Options" className="mt-7" /> */}
+        <StepTitle index={3} title="Layout Rules" className="mt-7" />
+
+        <LayoutRules
+          value={layoutRules}
+          onChange={onLayoutRulesChange}
+        />
+
+        {/* <StepTitle index={4} title="Options" className="mt-7" /> */}
 
         {/* <div class="space-y-3">
           {options.map((option) => (
@@ -156,7 +169,7 @@ export default function ResponsiveSidebar({
           class={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition ${
             importedFrame == null
               ? "cursor-not-allowed bg-gray-200 text-gray-400"
-              : "bg-[#5b35f5] text-white hover:bg-[#4c2ee0]"
+              : "bg-[#0f766e] text-white hover:bg-[#115e59]"
           }`}
         >
           <span>✦</span>
@@ -175,7 +188,7 @@ function SidebarHeader() {
   return (
     <header class="flex h-16 items-center justify-between border-b border-[#e5e7eb] px-5">
       <div class="flex items-center gap-3">
-        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#5b35f5] text-sm font-bold text-white">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f766e] text-sm font-bold text-white">
           R
         </div>
 
@@ -211,11 +224,11 @@ function StepTitle({
 }) {
   return (
     <div class={`mb-3 flex items-center gap-2 ${className}`}>
-      <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#5b35f5] text-[10px] font-bold text-white">
+      <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[#0f766e] text-[10px] font-bold text-white">
         {index}
       </span>
 
-      <h2 class="text-[11px] font-bold uppercase tracking-wide text-[#5b35f5]">
+      <h2 class="text-[11px] font-bold uppercase tracking-wide text-[#0f766e]">
         {title}
       </h2>
     </div>
@@ -262,7 +275,7 @@ function SourceFrameCard({
         <button
           type="button"
           onClick={onImport}
-          class="min-w-0 flex-1 rounded-xl border border-[#5b35f5] bg-[#f3f0ff] px-3 py-2 text-sm font-semibold text-[#5b35f5] transition hover:bg-[#ebe6ff]"
+          class="min-w-0  flex-1 rounded-xl border border-[#d97706] bg-[#fbbf24] px-3 py-4! text-sm font-semibold text-[#111827] shadow-sm transition hover:bg-[#f59e0b]"
         >
           Import Selected Frame
         </button>
@@ -312,20 +325,20 @@ function DeviceSelector({
             onClick={() => onChange(device.id)}
             class={`flex items-center justify-start gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition ${
               isSelected
-                ? "border-[#5b35f5] bg-[#f3f0ff] text-[#5b35f5]"
-                : "border-[#e5e7eb] bg-white text-gray-600 hover:bg-gray-50"
+                ? "border-[#d97706] bg-[#fbbf24] text-[#111827] shadow-sm"
+                : "border-[#cbd5e1] bg-[#f8fafc] text-gray-600 hover:border-gray-300 hover:bg-white"
             }`}
           >
             <span
               class={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
                 isSelected
-                  ? "border-[#5b35f5] bg-white"
+                  ? "border-[#0f766e] bg-white"
                   : "border-gray-300 bg-white"
               }`}
               aria-hidden="true"
             >
               <span
-                class={`h-2 w-2 rounded-full bg-[#5b35f5] transition ${
+                class={`h-2 w-2 rounded-full bg-[#0f766e] transition ${
                   isSelected ? "scale-100 opacity-100" : "scale-0 opacity-0"
                 }`}
               />
@@ -357,7 +370,7 @@ function ScreenWidthInput({
         <input
           value={value}
           onInput={(event) => onChange(event.currentTarget.value)}
-          class="h-10 min-w-0 flex-1 rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-[#5b35f5] focus:ring-2 focus:ring-[#5b35f5]/10"
+          class="h-10 min-w-0 flex-1 rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10"
         />
 
         <div class="flex h-10 w-14 items-center justify-center rounded-xl border border-[#e5e7eb] bg-gray-50 text-xs font-semibold text-gray-500">
@@ -373,8 +386,8 @@ function ScreenWidthInput({
             onClick={() => onChange(preset)}
             class={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${
               value === preset
-                ? "border-[#5b35f5] bg-[#f3f0ff] text-[#5b35f5]"
-                : "border-[#e5e7eb] bg-white text-gray-500 hover:bg-gray-50"
+                ? "border-[#d97706] bg-[#fbbf24] text-[#111827] shadow-sm"
+                : "border-[#cbd5e1] bg-[#f8fafc] text-gray-500 hover:border-gray-300 hover:bg-white"
             }`}
           >
             {preset}px
@@ -399,7 +412,7 @@ function OptionRow({
         onClick={onToggle}
         class={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[10px] font-bold transition ${
           option.enabled
-            ? "border-[#5b35f5] bg-[#5b35f5] text-white"
+            ? "border-[#d97706] bg-[#fbbf24] text-[#111827]"
             : "border-gray-300 bg-white text-transparent"
         }`}
       >

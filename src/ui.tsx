@@ -3,6 +3,7 @@ import { h } from "preact"
 import { useEffect, useState } from "preact/hooks"
 import "!./output.css"
 import ExportFramePanel, { type ExportFrameSnapshot } from "./components/ExportFramePanel"
+import { defaultLayoutRules, type LayoutRulesState } from "./components/LayoutRules"
 import ResponsiveSidebar, {
   type ResponsiveGenerationSettings,
   type TargetDevice
@@ -15,6 +16,7 @@ function Plugin() {
   const [importError, setImportError] = useState("")
   const [targetDevice, setTargetDevice] = useState<TargetDevice>("mobile")
   const [screenWidth, setScreenWidth] = useState("375")
+  const [layoutRules, setLayoutRules] = useState<LayoutRulesState>(defaultLayoutRules)
   const [exportSnapshot, setExportSnapshot] = useState<ExportFrameSnapshot | null>(null)
   const [isExportPanelOpen, setIsExportPanelOpen] = useState(false)
 
@@ -27,6 +29,7 @@ function Plugin() {
   function handleGenerate(settings: ResponsiveGenerationSettings) {
     setTargetDevice(settings.targetDevice)
     setScreenWidth(String(settings.screenWidth))
+    setLayoutRules(settings.layoutRules)
 
     if (importedFrame == null) {
       return
@@ -74,8 +77,10 @@ function Plugin() {
         importError={importError}
         targetDevice={targetDevice}
         screenWidth={screenWidth}
+        layoutRules={layoutRules}
         onTargetDeviceChange={setTargetDevice}
         onScreenWidthChange={setScreenWidth}
+        onLayoutRulesChange={setLayoutRules}
         onClearFrame={clearImportedFrame}
         onGenerate={handleGenerate}
       />
@@ -83,6 +88,7 @@ function Plugin() {
         frame={importedFrame}
         targetDevice={targetDevice}
         screenWidth={Number(screenWidth)}
+        layoutRules={layoutRules}
         onFrameChange={setImportedFrame}
       />
       <ExportFramePanel
