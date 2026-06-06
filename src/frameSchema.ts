@@ -7,6 +7,19 @@ export type FigmaJsonValue =
       [key: string]: FigmaJsonValue
     }
 
+export type ResponsiveConversionDirection = "row-to-column" | "column-to-row"
+export type ResponsiveConversionMode = "auto" | "always" | "never"
+export type ResponsiveStackAlignment = "start" | "center" | "stretch"
+
+export type ResponsiveNodeRule = {
+  enabled: boolean
+  conversionDirection: ResponsiveConversionDirection
+  rowToColumnMode: ResponsiveConversionMode
+  rowToColumnBreakpoint: number
+  stackGap: number
+  stackAlignment: ResponsiveStackAlignment
+}
+
 export type FigmaSerializedNode = {
   id: string
   name: string
@@ -17,6 +30,7 @@ export type FigmaSerializedNode = {
     conversionRole?: "auto-layout-container" | "manual-layer" | "responsive-group"
     acceptsChildren?: boolean
     createdByUser?: boolean
+    nodeRule?: ResponsiveNodeRule
   }
   visible: boolean
   locked: boolean
@@ -154,13 +168,16 @@ export type UiToPluginMessage =
       type: "generate-responsive-frame"
       payload: {
         targetDevice: "mobile" | "tablet" | "desktop" | "custom"
+        sourceWidth: number
         screenWidth: number
+        sourceFrame: FigmaSerializedFrame | null
         layoutRules: {
-          rowToColumnMode: "auto" | "always" | "never"
+          conversionDirection: ResponsiveConversionDirection
+          rowToColumnMode: ResponsiveConversionMode
           rowToColumnBreakpoint: number
           stackGap: number
           outputPadding: number
-          stackAlignment: "start" | "center" | "stretch"
+          stackAlignment: ResponsiveStackAlignment
           textScaleMode: "preserve" | "scale" | "clamp"
           minimumTextSize: number
           tightenLineHeight: boolean

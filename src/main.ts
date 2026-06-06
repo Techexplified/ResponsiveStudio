@@ -4,12 +4,14 @@ import type {
   FigmaSerializedFrame,
   FigmaSerializedNode,
   PluginToUiMessage,
+  ResponsiveNodeRule,
   UiToPluginMessage
 } from "./frameSchema"
 
 type ImportableFrameNode = FrameNode | ComponentNode | InstanceNode
 type GeneratedFrameNode = FrameNode | ComponentNode | InstanceNode
 type GenerationPayload = Extract<UiToPluginMessage, { type: "generate-responsive-frame" }>["payload"]
+type EffectiveGenerationRules = Omit<ResponsiveNodeRule, "enabled">
 type Bounds = {
   x: number
   y: number
@@ -78,18 +80,18 @@ function importSelectedFrame() {
 }
 
 async function generateResponsiveFrame(payload: GenerationPayload) {
-  const [selectedNode] = figma.currentPage.selection
+  const sourceNode = await getGenerationSourceNode(payload)
 
-  if (selectedNode == null || !isImportableFrameNode(selectedNode)) {
-    figma.notify("Select the source frame, component, or instance before generating.")
+  if (sourceNode == null) {
+    figma.notify("Import the source frame again before generating.")
     return
   }
 
-  const sourceWidth = Math.max(1, selectedNode.width)
-  const generatedNode = selectedNode.clone()
-  generatedNode.name = `${selectedNode.name} / ${getDeviceLabel(payload.targetDevice)}`
-  generatedNode.x = selectedNode.x + selectedNode.width + 80
-  generatedNode.y = selectedNode.y
+  const sourceWidth = clampNumber(payload.sourceWidth, 1, 10000)
+  const generatedNode = sourceNode.clone()
+  generatedNode.name = `${sourceNode.name} / ${getDeviceLabel(payload.targetDevice)}`
+  generatedNode.x = sourceNode.x + sourceNode.width + 80
+  generatedNode.y = sourceNode.y
 
   if (canResize(generatedNode)) {
     generatedNode.resize(
@@ -98,22 +100,59 @@ async function generateResponsiveFrame(payload: GenerationPayload) {
     )
   }
 
-  await applyResponsiveRules(generatedNode, payload, sourceWidth)
+  await applyResponsiveRules(
+    generatedNode,
+    payload,
+    sourceWidth,
+    createSourceNodeLookup(payload.sourceFrame),
+    ""
+  )
 
   figma.currentPage.selection = [generatedNode]
   figma.viewport.scrollAndZoomIntoView([generatedNode])
   figma.notify(`Generated ${Math.round(payload.screenWidth)}px responsive frame.`)
 }
 
-async function applyResponsiveRules(node: SceneNode, payload: GenerationPayload, sourceWidth: number) {
-  if (hasAutoLayout(node)) {
-    const shouldStack = shouldStackLayer(node, payload)
+async function getGenerationSourceNode(payload: GenerationPayload): Promise<ImportableFrameNode | null> {
+  if (payload.sourceFrame != null) {
+    const importedSourceNode = await figma.getNodeByIdAsync(payload.sourceFrame.id)
 
-    if (shouldStack) {
-      node.layoutMode = "VERTICAL"
-      node.itemSpacing = clampNumber(payload.layoutRules.stackGap, 0, 200)
-      node.counterAxisAlignItems = getFigmaCounterAxisAlignment(payload.layoutRules.stackAlignment)
-      applyStackChildAlignment(node, payload.layoutRules.stackAlignment)
+    if (importedSourceNode != null && isImportableFrameNode(importedSourceNode)) {
+      return importedSourceNode
+    }
+  }
+
+  const [selectedNode] = figma.currentPage.selection
+
+  return selectedNode != null && isImportableFrameNode(selectedNode)
+    ? selectedNode
+    : null
+}
+
+async function applyResponsiveRules(
+  node: SceneNode,
+  payload: GenerationPayload,
+  sourceWidth: number,
+  sourceNodeLookup: Map<string, FigmaSerializedNode>,
+  nodePath: string
+) {
+  const sourceNode = sourceNodeLookup.get(nodePath)
+  const effectiveRules = getEffectiveGenerationRules(payload, sourceNode?.responsive?.nodeRule)
+
+  if (hasAutoLayout(node)) {
+    const nextLayoutMode = getConvertedLayoutMode(node, payload, effectiveRules)
+
+    if (nextLayoutMode != null) {
+      node.layoutMode = nextLayoutMode
+      node.itemSpacing = clampNumber(effectiveRules.stackGap, 0, 200)
+      node.counterAxisAlignItems = getFigmaCounterAxisAlignment(effectiveRules.stackAlignment)
+    }
+
+    const activeLayoutMode = nextLayoutMode ?? getCurrentLayoutMode(node)
+
+    if (activeLayoutMode != null) {
+      applyConvertedChildSizing(node, activeLayoutMode, effectiveRules.stackAlignment, sourceNode)
+      applyResponsiveChildGeometry(node, activeLayoutMode, effectiveRules, sourceNode)
     }
 
     if (isRootResponsiveNode(node)) {
@@ -130,8 +169,16 @@ async function applyResponsiveRules(node: SceneNode, payload: GenerationPayload,
   }
 
   if (hasChildren(node)) {
-    for (const child of node.children) {
-      await applyResponsiveRules(child, payload, sourceWidth)
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index]
+
+      await applyResponsiveRules(
+        child,
+        payload,
+        sourceWidth,
+        sourceNodeLookup,
+        nodePath === "" ? String(index) : `${nodePath}/${index}`
+      )
     }
   }
 }
@@ -167,24 +214,102 @@ async function loadTextFonts(node: TextNode) {
   }
 }
 
-function shouldStackLayer(node: SceneNode, payload: GenerationPayload): boolean {
-  if (!hasAutoLayout(node) || node.layoutMode !== "HORIZONTAL") {
-    return false
+function getConvertedLayoutMode(
+  node: SceneNode,
+  payload: GenerationPayload,
+  layoutRules: EffectiveGenerationRules
+): "HORIZONTAL" | "VERTICAL" | null {
+  if (layoutRules.rowToColumnMode === "always") {
+    return getTargetLayoutMode(node, layoutRules)
   }
 
-  if (payload.layoutRules.rowToColumnMode === "always") {
-    return true
+  if (layoutRules.rowToColumnMode === "never") {
+    return null
   }
 
-  if (payload.layoutRules.rowToColumnMode === "never") {
-    return false
+  const shouldConvert = layoutRules.conversionDirection === "row-to-column"
+    ? payload.screenWidth <= layoutRules.rowToColumnBreakpoint
+    : payload.screenWidth >= layoutRules.rowToColumnBreakpoint
+
+  return shouldConvert ? getTargetLayoutMode(node, layoutRules) : null
+}
+
+function getTargetLayoutMode(
+  node: SceneNode,
+  layoutRules: EffectiveGenerationRules
+): "HORIZONTAL" | "VERTICAL" | null {
+  if (!hasAutoLayout(node)) {
+    return null
   }
 
-  return payload.screenWidth <= payload.layoutRules.rowToColumnBreakpoint
+  if (layoutRules.conversionDirection === "row-to-column") {
+    return node.layoutMode === "HORIZONTAL" ? "VERTICAL" : null
+  }
+
+  return node.layoutMode === "VERTICAL" ? "HORIZONTAL" : null
+}
+
+function getCurrentLayoutMode(node: SceneNode & AutoLayoutMixin): "HORIZONTAL" | "VERTICAL" | null {
+  if (node.layoutMode === "HORIZONTAL" || node.layoutMode === "VERTICAL") {
+    return node.layoutMode
+  }
+
+  return null
+}
+
+function getEffectiveGenerationRules(
+  payload: GenerationPayload,
+  nodeRule: ResponsiveNodeRule | undefined
+): EffectiveGenerationRules {
+  if (nodeRule?.enabled === true) {
+    return {
+      conversionDirection: nodeRule.conversionDirection,
+      rowToColumnMode: nodeRule.rowToColumnMode,
+      rowToColumnBreakpoint: nodeRule.rowToColumnBreakpoint,
+      stackGap: nodeRule.stackGap,
+      stackAlignment: nodeRule.stackAlignment
+    }
+  }
+
+  return {
+    conversionDirection: payload.layoutRules.conversionDirection,
+    rowToColumnMode: payload.layoutRules.rowToColumnMode,
+    rowToColumnBreakpoint: payload.layoutRules.rowToColumnBreakpoint,
+    stackGap: payload.layoutRules.stackGap,
+    stackAlignment: payload.layoutRules.stackAlignment
+  }
+}
+
+function createSourceNodeLookup(sourceFrame: FigmaSerializedFrame | null): Map<string, FigmaSerializedNode> {
+  const sourceNodeLookup = new Map<string, FigmaSerializedNode>()
+
+  if (sourceFrame == null) {
+    return sourceNodeLookup
+  }
+
+  collectSourceNodes(sourceFrame, "", sourceNodeLookup)
+
+  return sourceNodeLookup
+}
+
+function collectSourceNodes(
+  node: FigmaSerializedNode,
+  nodePath: string,
+  sourceNodeLookup: Map<string, FigmaSerializedNode>
+) {
+  sourceNodeLookup.set(nodePath, node)
+
+  node.children.forEach((child, index) => {
+    collectSourceNodes(
+      child,
+      nodePath === "" ? String(index) : `${nodePath}/${index}`,
+      sourceNodeLookup
+    )
+  })
 }
 
 function getFigmaCounterAxisAlignment(
-  alignment: GenerationPayload["layoutRules"]["stackAlignment"]
+  alignment: EffectiveGenerationRules["stackAlignment"]
 ): "MIN" | "CENTER" | "MAX" {
   if (alignment === "center") {
     return "CENTER"
@@ -193,21 +318,314 @@ function getFigmaCounterAxisAlignment(
   return "MIN"
 }
 
-function applyStackChildAlignment(
+function applyConvertedChildSizing(
   node: SceneNode & AutoLayoutMixin,
-  alignment: GenerationPayload["layoutRules"]["stackAlignment"]
+  layoutMode: "HORIZONTAL" | "VERTICAL",
+  alignment: EffectiveGenerationRules["stackAlignment"],
+  sourceNode: FigmaSerializedNode | undefined
 ) {
   if (!hasChildren(node)) {
     return
   }
 
-  for (const child of node.children) {
+  for (let index = 0; index < node.children.length; index += 1) {
+    const child = node.children[index]
+    const sourceChild = sourceNode?.children[index]
+    const fillsHorizontal = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "horizontal",
+      layoutMode === "VERTICAL" && alignment === "stretch",
+      layoutMode
+    )
+    const fillsVertical = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "vertical",
+      layoutMode === "HORIZONTAL" && alignment === "stretch",
+      layoutMode
+    )
+    const fillsMainAxis = layoutMode === "HORIZONTAL" ? fillsHorizontal : fillsVertical
+    const fillsCrossAxis = layoutMode === "HORIZONTAL" ? fillsVertical : fillsHorizontal
+
     if (!("layoutAlign" in child)) {
       continue
     }
 
-    child.layoutAlign = alignment === "stretch" ? "STRETCH" : "INHERIT"
+    child.layoutAlign = fillsCrossAxis ? "STRETCH" : "INHERIT"
+
+    if ("layoutGrow" in child) {
+      child.layoutGrow = fillsMainAxis ? 1 : 0
+    }
+
+    if ("layoutSizingHorizontal" in child) {
+      const sizing = fillsHorizontal ? "FILL" : getSerializedAxisSizing(sourceChild, "horizontal")
+
+      if (sizing != null) {
+        child.layoutSizingHorizontal = sizing
+      }
+    }
+
+    if ("layoutSizingVertical" in child) {
+      const sizing = fillsVertical ? "FILL" : getSerializedAxisSizing(sourceChild, "vertical")
+
+      if (sizing != null) {
+        child.layoutSizingVertical = sizing
+      }
+    }
   }
+}
+
+function applyResponsiveChildGeometry(
+  node: SceneNode & AutoLayoutMixin,
+  layoutMode: "HORIZONTAL" | "VERTICAL",
+  layoutRules: EffectiveGenerationRules,
+  sourceNode: FigmaSerializedNode | undefined
+) {
+  if (!hasChildren(node)) {
+    return
+  }
+
+  const padding = getNodePadding(node)
+  const contentWidth = Math.max(1, node.width - padding.left - padding.right)
+  const contentHeight = Math.max(1, node.height - padding.top - padding.bottom)
+  const gap = clampNumber(node.itemSpacing ?? layoutRules.stackGap, 0, 200)
+
+  if (layoutMode === "VERTICAL") {
+    resizeVerticalLayoutChildren(node, sourceNode, contentWidth, contentHeight, gap)
+    return
+  }
+
+  resizeHorizontalLayoutChildren(node, sourceNode, layoutRules, contentWidth, contentHeight, gap)
+}
+
+function resizeVerticalLayoutChildren(
+  node: SceneNode & AutoLayoutMixin & ChildrenMixin,
+  sourceNode: FigmaSerializedNode | undefined,
+  contentWidth: number,
+  contentHeight: number,
+  gap: number
+) {
+  const metrics = node.children.map((child, index) => {
+    const sourceChild = sourceNode?.children[index]
+    const fillsWidth = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "horizontal",
+      true,
+      "VERTICAL"
+    )
+    const fillsHeight = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "vertical",
+      false,
+      "VERTICAL"
+    )
+    const nextWidth = fillsWidth
+      ? contentWidth
+      : Math.min(readNumber(child, "width", contentWidth), contentWidth)
+
+    return {
+      child,
+      fillsHeight,
+      nextWidth
+    }
+  })
+  const totalGap = gap * Math.max(0, metrics.length - 1)
+  const fixedHeightTotal = metrics.reduce((total, metric) => {
+    return metric.fillsHeight ? total : total + readNumber(metric.child, "height", 0)
+  }, 0)
+  const fillHeightCount = metrics.filter((metric) => metric.fillsHeight).length
+  const fillHeight = fillHeightCount === 0
+    ? 0
+    : Math.max(1, (contentHeight - totalGap - fixedHeightTotal) / fillHeightCount)
+
+  for (const metric of metrics) {
+    const nextHeight = metric.fillsHeight ? fillHeight : readNumber(metric.child, "height", 1)
+
+    resizeSceneNode(metric.child, metric.nextWidth, nextHeight)
+  }
+}
+
+function resizeHorizontalLayoutChildren(
+  node: SceneNode & AutoLayoutMixin & ChildrenMixin,
+  sourceNode: FigmaSerializedNode | undefined,
+  layoutRules: EffectiveGenerationRules,
+  contentWidth: number,
+  contentHeight: number,
+  gap: number
+) {
+  const metrics = node.children.map((child, index) => {
+    const sourceChild = sourceNode?.children[index]
+
+    return {
+      child,
+      fillsWidth: shouldFillGeneratedAxis(
+        sourceChild,
+        child,
+        "horizontal",
+        false,
+        "HORIZONTAL"
+      ),
+      fillsHeight: shouldFillGeneratedAxis(
+        sourceChild,
+        child,
+        "vertical",
+        layoutRules.stackAlignment === "stretch",
+        "HORIZONTAL"
+      )
+    }
+  })
+  const totalGap = gap * Math.max(0, metrics.length - 1)
+  const fixedWidthTotal = metrics.reduce((total, metric) => {
+    return metric.fillsWidth ? total : total + readNumber(metric.child, "width", 0)
+  }, 0)
+  const fillWidthCount = metrics.filter((metric) => metric.fillsWidth).length
+  const fillWidth = fillWidthCount === 0
+    ? 0
+    : Math.max(1, (contentWidth - totalGap - fixedWidthTotal) / fillWidthCount)
+
+  for (const metric of metrics) {
+    const currentWidth = readNumber(metric.child, "width", 1)
+    const currentHeight = readNumber(metric.child, "height", 1)
+    const nextWidth = metric.fillsWidth ? fillWidth : currentWidth
+    const nextHeight = metric.fillsHeight ? contentHeight : currentHeight
+
+    resizeSceneNode(metric.child, nextWidth, nextHeight)
+  }
+}
+
+function getNodePadding(node: SceneNode & AutoLayoutMixin) {
+  return {
+    top: clampNumber(node.paddingTop, 0, 10000),
+    right: clampNumber(node.paddingRight, 0, 10000),
+    bottom: clampNumber(node.paddingBottom, 0, 10000),
+    left: clampNumber(node.paddingLeft, 0, 10000)
+  }
+}
+
+function resizeSceneNode(node: SceneNode, width: number, height: number) {
+  if (!canResize(node)) {
+    return
+  }
+
+  const nextWidth = Math.max(1, Math.round(width * 1000) / 1000)
+  const nextHeight = Math.max(1, Math.round(height * 1000) / 1000)
+
+  if (
+    Math.abs(readNumber(node, "width", nextWidth) - nextWidth) < 0.01 &&
+    Math.abs(readNumber(node, "height", nextHeight) - nextHeight) < 0.01
+  ) {
+    return
+  }
+
+  try {
+    node.resize(nextWidth, nextHeight)
+  } catch (_error) {
+    // Some Figma nodes reject explicit resize while their auto-layout sizing is controlled by the parent.
+  }
+}
+
+function shouldFillGeneratedAxis(
+  sourceNode: FigmaSerializedNode | undefined,
+  fallbackNode: SceneNode,
+  axis: "horizontal" | "vertical",
+  defaultFill: boolean,
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL"
+): boolean {
+  const serializedSizing = getSerializedAxisSizing(sourceNode, axis)
+
+  if (serializedSizing != null) {
+    return serializedSizing === "FILL"
+  }
+
+  if (sourceNode?.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return true
+  }
+
+  const sceneSizing = getSceneAxisSizing(fallbackNode, axis)
+
+  if (sceneSizing != null) {
+    return sceneSizing === "FILL"
+  }
+
+  return isSceneStretchedOnAxis(fallbackNode, axis, parentLayoutMode) || defaultFill
+}
+
+function getSerializedAxisSizing(
+  node: FigmaSerializedNode | undefined,
+  axis: "horizontal" | "vertical"
+): "FILL" | "HUG" | "FIXED" | null {
+  if (node == null) {
+    return null
+  }
+
+  const layoutSizing = axis === "horizontal"
+    ? node.layout.layoutSizingHorizontal
+    : node.layout.layoutSizingVertical
+
+  if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
+    return layoutSizing
+  }
+
+  const axisSizing = axisMatchesPrimaryAxis(node, axis)
+    ? node.layout.primaryAxisSizingMode
+    : node.layout.counterAxisSizingMode
+
+  if (axisSizing === "AUTO") {
+    return "HUG"
+  }
+
+  if (axisSizing === "FIXED") {
+    return "FIXED"
+  }
+
+  return null
+}
+
+function getSceneAxisSizing(
+  node: SceneNode,
+  axis: "horizontal" | "vertical"
+): "FILL" | "HUG" | "FIXED" | null {
+  if (axis === "horizontal" && "layoutSizingHorizontal" in node) {
+    return node.layoutSizingHorizontal
+  }
+
+  if (axis === "vertical" && "layoutSizingVertical" in node) {
+    return node.layoutSizingVertical
+  }
+
+  if (axis === "horizontal" && "layoutGrow" in node && node.layoutGrow > 0) {
+    return "FILL"
+  }
+
+  return null
+}
+
+function axisMatchesPrimaryAxis(node: FigmaSerializedNode, axis: "horizontal" | "vertical"): boolean {
+  return axis === "horizontal"
+    ? node.layout.layoutMode === "HORIZONTAL"
+    : node.layout.layoutMode === "VERTICAL"
+}
+
+function axisMatchesCrossAxis(
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  axis: "horizontal" | "vertical"
+): boolean {
+  return axis === "horizontal"
+    ? parentLayoutMode === "VERTICAL"
+    : parentLayoutMode === "HORIZONTAL"
+}
+
+function isSceneStretchedOnAxis(
+  node: SceneNode,
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL"
+): boolean {
+  return "layoutAlign" in node &&
+    node.layoutAlign === "STRETCH" &&
+    axisMatchesCrossAxis(parentLayoutMode, axis)
 }
 
 function isRootResponsiveNode(node: SceneNode): node is GeneratedFrameNode {
@@ -459,7 +877,7 @@ function serializeText(node: TextNode): FigmaSerializedNode["text"] {
   }
 }
 
-function isImportableFrameNode(node: SceneNode): node is ImportableFrameNode {
+function isImportableFrameNode(node: BaseNode): node is ImportableFrameNode {
   return node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE"
 }
 

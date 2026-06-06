@@ -1,11 +1,13 @@
 import { h } from "preact"
 import type { ComponentChildren } from "preact"
 
+export type LayoutConversionDirection = "row-to-column" | "column-to-row"
 export type RowToColumnMode = "auto" | "always" | "never"
 export type StackAlignment = "start" | "center" | "stretch"
 export type TextScaleMode = "preserve" | "scale" | "clamp"
 
 export type LayoutRulesState = {
+  conversionDirection: LayoutConversionDirection
   rowToColumnMode: RowToColumnMode
   rowToColumnBreakpoint: number
   stackGap: number
@@ -17,6 +19,7 @@ export type LayoutRulesState = {
 }
 
 export const defaultLayoutRules: LayoutRulesState = {
+  conversionDirection: "row-to-column",
   rowToColumnMode: "auto",
   rowToColumnBreakpoint: 480,
   stackGap: 16,
@@ -43,32 +46,58 @@ export default function LayoutRules({ value, onChange }: LayoutRulesProps) {
   return (
     <div class="rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-sm">
       <RuleHeader
-        title="Row to columns"
-        description="Stack horizontal groups when the target width gets tight."
+        title="Layout conversion"
+        description="Choose how Auto Layout groups should change direction in generated frames."
       />
 
-      <SegmentedControl
-        value={value.rowToColumnMode}
-        options={[
-          { value: "auto", label: "Auto" },
-          { value: "always", label: "Always" },
-          { value: "never", label: "Never" }
-        ]}
-        onChange={(rowToColumnMode) => update({ rowToColumnMode })}
-      />
+      <ControlGroup label="Direction">
+        <SegmentedControl
+          value={value.conversionDirection}
+          columns={2}
+          options={[
+            { value: "row-to-column", label: "Row > Column" },
+            { value: "column-to-row", label: "Column > Row" }
+          ]}
+          onChange={(conversionDirection) => update({ conversionDirection })}
+        />
+      </ControlGroup>
+
+      <div class="mt-3">
+        <ControlGroup label="Trigger">
+          <SegmentedControl
+            value={value.rowToColumnMode}
+            options={[
+              { value: "auto", label: "Auto" },
+              { value: "always", label: "Always" },
+              { value: "never", label: "Never" }
+            ]}
+            onChange={(rowToColumnMode) => update({ rowToColumnMode })}
+          />
+        </ControlGroup>
+      </div>
+
+      <div class="mt-3 rounded-xl border border-[#e5e7eb] bg-[#f8fafc] p-3">
+        <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          <DirectionPreviewBox label={value.conversionDirection === "row-to-column" ? "Row" : "Column"} />
+          <span class="text-center text-xs font-bold text-gray-400">
+            to
+          </span>
+          <DirectionPreviewBox label={value.conversionDirection === "row-to-column" ? "Column" : "Row"} active />
+        </div>
+      </div>
 
       <div class="mt-3 grid grid-cols-2 gap-2">
         <NumberField
-          label="Breakpoint"
+          label={value.conversionDirection === "row-to-column" ? "Max width" : "Min width"}
           value={value.rowToColumnBreakpoint}
           suffix="px"
           min={240}
-          max={1200}
+          max={1600}
           onChange={(rowToColumnBreakpoint) => update({ rowToColumnBreakpoint })}
         />
 
         <NumberField
-          label="Stack gap"
+          label="Gap"
           value={value.stackGap}
           suffix="px"
           min={0}
@@ -78,7 +107,7 @@ export default function LayoutRules({ value, onChange }: LayoutRulesProps) {
       </div>
 
       <div class="mt-3 grid grid-cols-[minmax(0,1fr)_130px] gap-2">
-        <ControlGroup label="Stack align">
+        <ControlGroup label="Child align">
           <SegmentedControl
             value={value.stackAlignment}
             options={[
@@ -91,7 +120,7 @@ export default function LayoutRules({ value, onChange }: LayoutRulesProps) {
         </ControlGroup>
 
         <NumberField
-          label="Padding"
+          label="Frame pad"
           value={value.outputPadding}
           suffix="px"
           min={0}
@@ -143,6 +172,40 @@ export default function LayoutRules({ value, onChange }: LayoutRulesProps) {
   )
 }
 
+function DirectionPreviewBox({
+  label,
+  active = false
+}: {
+  label: string
+  active?: boolean
+}) {
+  return (
+    <div class={`rounded-lg border px-2 py-2 ${
+      active
+        ? "border-[#0f766e] bg-white"
+        : "border-[#e5e7eb] bg-white/70"
+    }`}>
+      <p class={`text-center text-[10px] font-bold uppercase ${
+        active ? "text-[#0f766e]" : "text-gray-400"
+      }`}>
+        {label}
+      </p>
+      <div class={`mt-2 flex gap-1 ${
+        label === "Column" ? "flex-col" : "items-center"
+      }`}>
+        {[0, 1, 2].map((item) => (
+          <span
+            key={item}
+            class={`block rounded-sm ${
+              active ? "bg-[#0f766e]" : "bg-gray-300"
+            } ${label === "Column" ? "h-1.5 w-full" : "h-5 flex-1"}`}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function RuleHeader({
   title,
   description
@@ -182,6 +245,7 @@ function ControlGroup({
 function SegmentedControl<T extends string>({
   value,
   options,
+  columns = 3,
   onChange
 }: {
   value: T
@@ -189,10 +253,13 @@ function SegmentedControl<T extends string>({
     value: T
     label: string
   }>
+  columns?: 2 | 3
   onChange: (value: T) => void
 }) {
   return (
-    <div class="grid grid-cols-3 gap-1.5 rounded-2xl border border-[#cbd5e1] bg-[#e2e8f0] p-1.5">
+    <div class={`grid gap-1.5 rounded-2xl border border-[#cbd5e1] bg-[#e2e8f0] p-1.5 ${
+      columns === 2 ? "grid-cols-2" : "grid-cols-3"
+    }`}>
       {options.map((option) => {
         const isSelected = option.value === value
 

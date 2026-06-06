@@ -113,15 +113,74 @@ export function moveNodeIntoGroup(
   nodeId: string,
   groupId: string
 ): FigmaSerializedFrame | null {
+  const nodeRootPosition = getNodeRootPosition(frame, nodeId)
+  const groupRootPosition = getNodeRootPosition(frame, groupId)
+
+  if (nodeRootPosition == null || groupRootPosition == null) {
+    return null
+  }
+
   const result = removeNode(frame, nodeId)
 
   if (result == null) {
     return null
   }
 
+  const node = updateNodePosition(
+    result.node,
+    nodeRootPosition.x - groupRootPosition.x,
+    nodeRootPosition.y - groupRootPosition.y
+  )
+
   return updateNode(result.frame, groupId, (group) => ({
     ...group,
-    children: [...group.children, result.node]
+    children: [...group.children, node]
+  }))
+}
+
+export function deleteNodeFromFrame(
+  frame: FigmaSerializedFrame,
+  nodeId: string
+): FigmaSerializedFrame | null {
+  if (frame.id === nodeId) {
+    return null
+  }
+
+  return removeNode(frame, nodeId)?.frame ?? null
+}
+
+export function wrapNodeInGroup(
+  frame: FigmaSerializedFrame,
+  nodeId: string
+): FigmaSerializedFrame | null {
+  if (frame.id === nodeId) {
+    return null
+  }
+
+  const node = findNode(frame, nodeId)
+  const parent = findParentNode(frame, nodeId)
+
+  if (node == null || parent == null) {
+    return null
+  }
+
+  const group = {
+    ...createVirtualGroup(),
+    name: `${node.name} group`,
+    geometry: createEditorGeometry(
+      node.geometry.x,
+      node.geometry.y,
+      node.geometry.width,
+      node.geometry.height
+    ),
+    children: [
+      updateNodePosition(node, 0, 0)
+    ]
+  }
+
+  return updateNode(frame, parent.id, (parentNode) => ({
+    ...parentNode,
+    children: parentNode.children.map((child) => child.id === node.id ? group : child)
   }))
 }
 
@@ -180,15 +239,75 @@ export function normalizeVirtualGroupGeometry<T extends FigmaSerializedNode>(nod
   }
 
   const bounds = getChildrenBounds(children)
+  const isEmptyShell = nextNode.geometry.width === 0 && nextNode.geometry.height === 0
+  const offsetX = bounds == null ? 0 : isEmptyShell || bounds.x < 0 ? bounds.x : 0
+  const offsetY = bounds == null ? 0 : isEmptyShell || bounds.y < 0 ? bounds.y : 0
+  const groupX = nextNode.geometry.x + offsetX
+  const groupY = nextNode.geometry.y + offsetY
+  const normalizedChildren = bounds == null
+    ? children
+    : children.map((child) => moveNodeBy(child, -offsetX, -offsetY))
+  const normalizedBounds = getChildrenBounds(normalizedChildren)
+  const width = normalizedBounds == null
+    ? nextNode.geometry.width
+    : Math.max(nextNode.geometry.width - offsetX, normalizedBounds.x + normalizedBounds.width)
+  const height = normalizedBounds == null
+    ? nextNode.geometry.height
+    : Math.max(nextNode.geometry.height - offsetY, normalizedBounds.y + normalizedBounds.height)
 
   return {
     ...nextNode,
+    children: normalizedChildren,
     geometry: createEditorGeometry(
-      bounds?.x ?? 0,
-      bounds?.y ?? 0,
-      bounds?.width ?? 0,
-      bounds?.height ?? 0,
+      groupX,
+      groupY,
+      width,
+      height,
       nextNode.geometry
+    )
+  }
+}
+
+function getNodeRootPosition(
+  node: FigmaSerializedNode,
+  nodeId: string,
+  offset = { x: 0, y: 0 }
+): Pick<NodeBounds, "x" | "y"> | null {
+  if (node.id === nodeId) {
+    return offset
+  }
+
+  for (const child of node.children) {
+    const match = getNodeRootPosition(child, nodeId, {
+      x: offset.x + child.geometry.x,
+      y: offset.y + child.geometry.y
+    })
+
+    if (match != null) {
+      return match
+    }
+  }
+
+  return null
+}
+
+function moveNodeBy<T extends FigmaSerializedNode>(node: T, deltaX: number, deltaY: number): T {
+  return updateNodePosition(
+    node,
+    node.geometry.x + deltaX,
+    node.geometry.y + deltaY
+  )
+}
+
+function updateNodePosition<T extends FigmaSerializedNode>(node: T, x: number, y: number): T {
+  return {
+    ...node,
+    geometry: createEditorGeometry(
+      x,
+      y,
+      node.geometry.width,
+      node.geometry.height,
+      node.geometry
     )
   }
 }
@@ -211,7 +330,7 @@ export function applyFlexLayoutToNode<T extends FigmaSerializedNode>(node: T): T
   const isHorizontal = layoutMode === "HORIZONTAL"
   const mainSize = isHorizontal ? innerWidth : innerHeight
   const crossSize = isHorizontal ? innerHeight : innerWidth
-  const childMetrics = node.children.map((child) => {
+  const baseChildMetrics = node.children.map((child) => {
     const margin = child.layout.margin ?? {
       top: 0,
       right: 0,
@@ -224,6 +343,8 @@ export function applyFlexLayoutToNode<T extends FigmaSerializedNode>(node: T): T
     const crossEndMargin = isHorizontal ? margin.bottom : margin.right
     const childMainSize = isHorizontal ? child.geometry.width : child.geometry.height
     const childCrossSize = isHorizontal ? child.geometry.height : child.geometry.width
+    const fillsMainAxis = getNodeAxisSizing(child, isHorizontal ? "horizontal" : "vertical") === "FILL"
+    const fillsCrossAxis = getNodeAxisSizing(child, isHorizontal ? "vertical" : "horizontal") === "FILL"
 
     return {
       child,
@@ -232,12 +353,43 @@ export function applyFlexLayoutToNode<T extends FigmaSerializedNode>(node: T): T
       mainEndMargin,
       crossStartMargin,
       crossEndMargin,
+      fillsMainAxis,
+      fillsCrossAxis,
+      childMainSize,
+      childCrossSize,
       mainSize: childMainSize + mainStartMargin + mainEndMargin,
       crossSize: childCrossSize + crossStartMargin + crossEndMargin
     }
   })
+  const fillMainAxisCount = baseChildMetrics.filter((child) => child.fillsMainAxis).length
+  const fixedChildrenMainSize = baseChildMetrics.reduce((total, child) => {
+    return child.fillsMainAxis ? total : total + child.mainSize
+  }, 0)
+  const baseGapTotal = gap * Math.max(0, baseChildMetrics.length - 1)
+  const fillChildMainSize = fillMainAxisCount === 0
+    ? 0
+    : Math.max(1, (mainSize - fixedChildrenMainSize - baseGapTotal) / fillMainAxisCount)
+  const childMetrics = baseChildMetrics.map((metric) => {
+    if (!metric.fillsMainAxis && !metric.fillsCrossAxis) {
+      return metric
+    }
+
+    const childMainSize = metric.fillsMainAxis
+      ? fillChildMainSize
+      : metric.childMainSize
+    const childCrossSize = metric.fillsCrossAxis
+      ? Math.max(1, crossSize - metric.crossStartMargin - metric.crossEndMargin)
+      : metric.childCrossSize
+
+    return {
+      ...metric,
+      childMainSize,
+      childCrossSize,
+      mainSize: childMainSize + metric.mainStartMargin + metric.mainEndMargin,
+      crossSize: childCrossSize + metric.crossStartMargin + metric.crossEndMargin
+    }
+  })
   const totalChildrenMainSize = childMetrics.reduce((total, child) => total + child.mainSize, 0)
-  const baseGapTotal = gap * Math.max(0, childMetrics.length - 1)
   const mainUsed = totalChildrenMainSize + baseGapTotal
   const justify = node.layout.primaryAxisAlignItems ?? "MIN"
   const align = node.layout.counterAxisAlignItems ?? "MIN"
@@ -258,13 +410,15 @@ export function applyFlexLayoutToNode<T extends FigmaSerializedNode>(node: T): T
       const nextY = isHorizontal
         ? padding.top + metric.crossStartMargin + crossOffset
         : cursor + metric.mainStartMargin
+      const nextWidth = isHorizontal ? metric.childMainSize : metric.childCrossSize
+      const nextHeight = isHorizontal ? metric.childCrossSize : metric.childMainSize
       const nextChild = {
         ...child,
         geometry: createEditorGeometry(
           nextX,
           nextY,
-          child.geometry.width,
-          child.geometry.height,
+          nextWidth,
+          nextHeight,
           child.geometry
         )
       }
@@ -274,6 +428,45 @@ export function applyFlexLayoutToNode<T extends FigmaSerializedNode>(node: T): T
       return nextChild
     })
   }
+}
+
+type AxisSizingMode = "FILL" | "HUG" | "FIXED" | null
+
+function getNodeAxisSizing(
+  node: FigmaSerializedNode,
+  axis: "horizontal" | "vertical"
+): AxisSizingMode {
+  const layoutSizing = axis === "horizontal"
+    ? node.layout.layoutSizingHorizontal
+    : node.layout.layoutSizingVertical
+
+  if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
+    return layoutSizing
+  }
+
+  const axisSizing = axisMatchesPrimaryAxis(node, axis)
+    ? node.layout.primaryAxisSizingMode
+    : node.layout.counterAxisSizingMode
+
+  if (axisSizing === "AUTO") {
+    return "HUG"
+  }
+
+  if (axisSizing === "FIXED") {
+    return "FIXED"
+  }
+
+  if (axis === "horizontal" && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0) {
+    return "FILL"
+  }
+
+  return null
+}
+
+function axisMatchesPrimaryAxis(node: FigmaSerializedNode, axis: "horizontal" | "vertical"): boolean {
+  return axis === "horizontal"
+    ? node.layout.layoutMode === "HORIZONTAL"
+    : node.layout.layoutMode === "VERTICAL"
 }
 
 function getMainOffset(

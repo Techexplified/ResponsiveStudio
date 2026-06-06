@@ -29,13 +29,16 @@ export default function ExportFramePanel({
           device: snapshot.settings.targetDevice,
           width: snapshot.settings.screenWidth
         },
+        source: {
+          importedWidth: snapshot.settings.sourceWidth
+        },
         appliedOptions: snapshot.settings.options.filter((option) => option.enabled),
         frame: snapshot.frame
       }
 
   return (
     <aside
-      class={`fixed right-0 top-0 z-30 flex h-screen w-[420px] flex-col border-l border-[#e5e7eb] bg-white shadow-2xl transition-transform duration-300 ${
+      class={`fixed right-0 top-0 z-[60] flex h-screen w-[min(420px,100vw)] flex-col border-l border-[#e5e7eb] bg-white shadow-2xl transition-transform duration-300 ${
         isOpen ? "translate-x-0" : "translate-x-full"
       }`}
       aria-hidden={!isOpen}
@@ -77,6 +80,7 @@ export default function ExportFramePanel({
             <div class="grid grid-cols-2 gap-3">
               <SummaryItem label="Target" value={snapshot.settings.targetDevice} />
               <SummaryItem label="Width" value={`${snapshot.settings.screenWidth}px`} />
+              <SummaryItem label="Imported" value={`${snapshot.settings.sourceWidth}px`} />
               <SummaryItem label="Source" value={snapshot.frame.name} />
               <SummaryItem label="Children" value={String(snapshot.frame.children.length)} />
             </div>

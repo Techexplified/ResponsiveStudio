@@ -13,7 +13,7 @@ export function JsonViewerSlider({
   onToggle
 }: JsonViewerSliderProps) {
   return (
-    <section class="absolute bottom-0 left-0 right-0 z-30 h-12 border-t border-[#e5e7eb] bg-[#111827]">
+    <section class="absolute bottom-0 left-0 right-12 z-30 h-12 border-t border-[#e5e7eb] bg-[#111827]">
       <button
         type="button"
         onClick={onToggle}

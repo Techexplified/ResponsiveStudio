@@ -15,6 +15,7 @@ function Plugin() {
   const [importedFrame, setImportedFrame] = useState<FigmaSerializedFrame | null>(null)
   const [importError, setImportError] = useState("")
   const [targetDevice, setTargetDevice] = useState<TargetDevice>("mobile")
+  const [sourceWidth, setSourceWidth] = useState("")
   const [screenWidth, setScreenWidth] = useState("375")
   const [layoutRules, setLayoutRules] = useState<LayoutRulesState>(defaultLayoutRules)
   const [exportSnapshot, setExportSnapshot] = useState<ExportFrameSnapshot | null>(null)
@@ -22,12 +23,14 @@ function Plugin() {
 
   function clearImportedFrame() {
     setImportedFrame(null)
+    setSourceWidth("")
     setImportError("")
     setIsExportPanelOpen(false)
   }
 
   function handleGenerate(settings: ResponsiveGenerationSettings) {
     setTargetDevice(settings.targetDevice)
+    setSourceWidth(String(settings.sourceWidth))
     setScreenWidth(String(settings.screenWidth))
     setLayoutRules(settings.layoutRules)
 
@@ -54,6 +57,7 @@ function Plugin() {
 
       if (message.type === "frame-imported") {
         setImportedFrame(message.payload)
+        setSourceWidth(String(Math.round(message.payload.geometry.width)))
         setImportError("")
         return
       }
@@ -76,9 +80,11 @@ function Plugin() {
         importedFrame={importedFrame}
         importError={importError}
         targetDevice={targetDevice}
+        sourceWidth={sourceWidth}
         screenWidth={screenWidth}
         layoutRules={layoutRules}
         onTargetDeviceChange={setTargetDevice}
+        onSourceWidthChange={setSourceWidth}
         onScreenWidthChange={setScreenWidth}
         onLayoutRulesChange={setLayoutRules}
         onClearFrame={clearImportedFrame}

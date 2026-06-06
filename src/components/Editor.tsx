@@ -54,6 +54,8 @@ export default function Editor({
 
             <ExportPreviewDrawer
               frame={frame}
+              selectedNodeId={selectedNodeId}
+              onSelect={setSelectedNodeId}
               targetDevice={targetDevice}
               screenWidth={screenWidth}
               layoutRules={layoutRules}
@@ -73,6 +75,7 @@ export default function Editor({
       <LayerPanel
         frame={frame}
         selectedNodeId={selectedNodeId}
+        layoutRules={layoutRules}
         onSelect={setSelectedNodeId}
         onFrameChange={onFrameChange}
       />

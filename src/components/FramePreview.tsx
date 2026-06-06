@@ -1,4 +1,4 @@
-import { Fragment, h } from "preact"
+import { h } from "preact"
 import { useEffect, useRef, useState } from "preact/hooks"
 import type { FigmaSerializedFrame, FigmaSerializedNode } from "../frameSchema"
 import {
@@ -133,24 +133,26 @@ function PreviewNode({
   if (isVirtualGroup(node)) {
     const isSelected = selectedNodeId === node.id
     const box = getChildrenBounds(node.children)
+    const width = Math.max(node.geometry.width, box?.width ?? 0)
+    const height = Math.max(node.geometry.height, box?.height ?? 0)
 
     return (
-      <Fragment>
-        {isSelected && box != null && (
-          <div
-            class="pointer-events-none absolute"
-            title={node.name}
-            style={{
-              left: `${box.x * scale}px`,
-              top: `${box.y * scale}px`,
-              width: `${box.width * scale}px`,
-              height: `${box.height * scale}px`,
-              outline: "2px solid #0f766e",
-              outlineOffset: "-2px"
-            }}
-          />
-        )}
-
+      <div
+        class="absolute cursor-pointer overflow-visible"
+        title={node.name}
+        onClick={(event) => {
+          event.stopPropagation()
+          onSelect(node.id)
+        }}
+        style={{
+          left: `${node.geometry.x * scale}px`,
+          top: `${node.geometry.y * scale}px`,
+          width: `${Math.max(1, width * scale)}px`,
+          height: `${Math.max(1, height * scale)}px`,
+          outline: isSelected ? "2px solid #0f766e" : "1px dashed rgba(15, 118, 110, 0.5)",
+          outlineOffset: isSelected ? "-2px" : "-1px"
+        }}
+      >
         {node.children.map((child) => (
           <PreviewNode
             key={child.id}
@@ -160,7 +162,7 @@ function PreviewNode({
             onSelect={onSelect}
           />
         ))}
-      </Fragment>
+      </div>
     )
   }
 

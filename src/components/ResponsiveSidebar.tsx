@@ -6,6 +6,12 @@ import type { FigmaSerializedFrame } from "../frameSchema"
 
 export type TargetDevice = "mobile" | "tablet" | "desktop" | "custom"
 
+const fixedDeviceWidths: Record<Exclude<TargetDevice, "custom">, string> = {
+  mobile: "375",
+  tablet: "768",
+  desktop: "1440"
+}
+
 type ConversionOption = {
   id: string
   label: string
@@ -15,7 +21,9 @@ type ConversionOption = {
 
 export type ResponsiveGenerationSettings = {
   targetDevice: TargetDevice
+  sourceWidth: number
   screenWidth: number
+  sourceFrame: FigmaSerializedFrame | null
   layoutRules: LayoutRulesState
   options: ConversionOption[]
 }
@@ -25,9 +33,11 @@ export default function ResponsiveSidebar({
   importedFrame,
   importError,
   targetDevice,
+  sourceWidth,
   screenWidth,
   layoutRules,
   onTargetDeviceChange,
+  onSourceWidthChange,
   onScreenWidthChange,
   onLayoutRulesChange,
   onClearFrame,
@@ -36,9 +46,11 @@ export default function ResponsiveSidebar({
   importedFrame: FigmaSerializedFrame | null
   importError: string
   targetDevice: TargetDevice
+  sourceWidth: string
   screenWidth: string
   layoutRules: LayoutRulesState
   onTargetDeviceChange: (value: TargetDevice) => void
+  onSourceWidthChange: (value: string) => void
   onScreenWidthChange: (value: string) => void
   onLayoutRulesChange: (value: LayoutRulesState) => void
   onClearFrame: () => void
@@ -47,8 +59,8 @@ export default function ResponsiveSidebar({
   const [options, setOptions] = useState<ConversionOption[]>([
     {
       id: "auto-stack",
-      label: "Auto stack sections",
-      description: "Convert large layouts into responsive stacks.",
+      label: "Convert layout direction",
+      description: "Switch rows and columns based on the layout rules.",
       enabled: true
     },
     {
@@ -97,7 +109,9 @@ export default function ResponsiveSidebar({
   function generateResponsiveFrame() {
     const payload = {
       targetDevice,
+      sourceWidth: Number(sourceWidth),
       screenWidth: Number(screenWidth),
+      sourceFrame: importedFrame,
       layoutRules,
       options
     }
@@ -115,6 +129,14 @@ export default function ResponsiveSidebar({
     onGenerate(payload)
   }
 
+  function changeTargetDevice(nextTargetDevice: TargetDevice) {
+    onTargetDeviceChange(nextTargetDevice)
+
+    if (nextTargetDevice !== "custom") {
+      onScreenWidthChange(fixedDeviceWidths[nextTargetDevice])
+    }
+  }
+
   return (
     <aside class="flex h-full w-[360px] flex-col border-r border-[#e5e7eb] bg-white shadow-sm">
       <SidebarHeader />
@@ -129,17 +151,29 @@ export default function ResponsiveSidebar({
           onClear={onClearFrame}
         />
 
+        <WidthInput
+          className="mt-4"
+          label="Imported Width"
+          value={sourceWidth}
+          onChange={onSourceWidthChange}
+          disabled={importedFrame == null}
+        />
+
         <StepTitle index={2} title="Target Device" className="mt-7" />
 
         <DeviceSelector
           value={targetDevice}
-          onChange={onTargetDeviceChange}
+          onChange={changeTargetDevice}
         />
 
-        <ScreenWidthInput
-          value={screenWidth}
-          onChange={onScreenWidthChange}
-        />
+        {targetDevice === "custom" && (
+          <WidthInput
+            label="Screen Width"
+            value={screenWidth}
+            onChange={onScreenWidthChange}
+            presets={["375", "390", "414"]}
+          />
+        )}
 
         <StepTitle index={3} title="Layout Rules" className="mt-7" />
 
@@ -165,9 +199,9 @@ export default function ResponsiveSidebar({
         <button
           type="button"
           onClick={generateResponsiveFrame}
-          disabled={importedFrame == null}
+          disabled={importedFrame == null || !isValidWidth(sourceWidth) || !isValidWidth(screenWidth)}
           class={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition ${
-            importedFrame == null
+            importedFrame == null || !isValidWidth(sourceWidth) || !isValidWidth(screenWidth)
               ? "cursor-not-allowed bg-gray-200 text-gray-400"
               : "bg-[#0f766e] text-white hover:bg-[#115e59]"
           }`}
@@ -304,11 +338,12 @@ function DeviceSelector({
   const devices: Array<{
     id: TargetDevice
     label: string
+    widthLabel: string
   }> = [
-    { id: "mobile", label: "Mobile" },
-    { id: "tablet", label: "Tablet" },
-    { id: "desktop", label: "Desktop" },
-    { id: "custom", label: "Custom" }
+    { id: "mobile", label: "Mobile", widthLabel: `${fixedDeviceWidths.mobile}px` },
+    { id: "tablet", label: "Tablet", widthLabel: `${fixedDeviceWidths.tablet}px` },
+    { id: "desktop", label: "Desktop", widthLabel: `${fixedDeviceWidths.desktop}px` },
+    { id: "custom", label: "Custom", widthLabel: "Manual" }
   ]
 
   return (
@@ -343,7 +378,16 @@ function DeviceSelector({
                 }`}
               />
             </span>
-            {device.label}
+            <span class="min-w-0">
+              <span class="block truncate">
+                {device.label}
+              </span>
+              <span class={`block truncate text-[10px] ${
+                isSelected ? "text-[#374151]" : "text-gray-400"
+              }`}>
+                {device.widthLabel}
+              </span>
+            </span>
           </button>
         )
       })}
@@ -351,26 +395,35 @@ function DeviceSelector({
   )
 }
 
-function ScreenWidthInput({
+function WidthInput({
+  label,
   value,
-  onChange
+  onChange,
+  presets = [],
+  disabled = false,
+  className = "mt-4"
 }: {
+  label: string
   value: string
   onChange: (value: string) => void
+  presets?: string[]
+  disabled?: boolean
+  className?: string
 }) {
-  const presets = ["375", "390", "414"]
-
   return (
-    <div class="mt-4">
+    <div class={className}>
       <label class="mb-2 block text-xs font-semibold text-gray-700">
-        Screen Width
+        {label}
       </label>
 
       <div class="flex gap-2">
         <input
+          type="number"
+          min="1"
           value={value}
+          disabled={disabled}
           onInput={(event) => onChange(event.currentTarget.value)}
-          class="h-10 min-w-0 flex-1 rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10"
+          class="h-10 min-w-0 flex-1 rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10 disabled:bg-gray-50 disabled:text-gray-400"
         />
 
         <div class="flex h-10 w-14 items-center justify-center rounded-xl border border-[#e5e7eb] bg-gray-50 text-xs font-semibold text-gray-500">
@@ -378,7 +431,8 @@ function ScreenWidthInput({
         </div>
       </div>
 
-      <div class="mt-3 grid grid-cols-3 gap-2">
+      {presets.length > 0 && (
+        <div class="mt-3 grid grid-cols-3 gap-2">
         {presets.map((preset) => (
           <button
             key={preset}
@@ -393,9 +447,16 @@ function ScreenWidthInput({
             {preset}px
           </button>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function isValidWidth(value: string): boolean {
+  const numberValue = Number(value)
+
+  return Number.isFinite(numberValue) && numberValue > 0
 }
 
 function OptionRow({
