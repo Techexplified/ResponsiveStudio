@@ -1,4 +1,5 @@
 import { h } from "preact"
+import { useState } from "preact/hooks"
 import type { FigmaSerializedFrame } from "../frameSchema"
 
 type JsonViewerSliderProps = {
@@ -43,6 +44,22 @@ export function JsonViewerOverlay({
   frame: FigmaSerializedFrame
   onClose: () => void
 }) {
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle")
+  const json = JSON.stringify(frame, null, 2)
+
+  async function copyJson() {
+    const didCopy = await copyText(json)
+
+    if (didCopy) {
+      setCopyStatus("copied")
+      window.setTimeout(() => setCopyStatus("idle"), 1600)
+      return
+    }
+
+    setCopyStatus("error")
+    window.setTimeout(() => setCopyStatus("idle"), 1600)
+  }
+
   return (
     <section class="fixed inset-0 z-50 flex min-h-0 flex-col bg-[#111827] shadow-2xl">
       <header class="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-6">
@@ -55,23 +72,31 @@ export function JsonViewerOverlay({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          class="rounded-lg px-2 py-1 text-xs font-semibold text-[#5eead4] transition hover:bg-white/5"
-        >
-          Collapse
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={copyJson}
+            class="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-[#5eead4] transition hover:bg-white/5"
+          >
+            {copyStatus === "copied" ? "Copied" : copyStatus === "error" ? "Copy failed" : "Copy JSON"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            class="rounded-lg px-2 py-1 text-xs font-semibold text-[#5eead4] transition hover:bg-white/5"
+          >
+            Collapse
+          </button>
+        </div>
       </header>
 
-      <JsonPreviewPanel frame={frame} />
+      <JsonPreviewPanel json={json} />
     </section>
   )
 }
 
-function JsonPreviewPanel({ frame }: { frame: FigmaSerializedFrame }) {
-  const json = JSON.stringify(frame, null, 2)
-
+function JsonPreviewPanel({ json }: { json: string }) {
   return (
     <section class="flex min-h-0 flex-1 flex-col bg-[#111827]">
       <pre class="min-h-0 flex-1 overflow-auto p-4 text-xs leading-5 text-gray-100">
@@ -79,4 +104,34 @@ function JsonPreviewPanel({ frame }: { frame: FigmaSerializedFrame }) {
       </pre>
     </section>
   )
+}
+
+async function copyText(value: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText != null) {
+      await navigator.clipboard.writeText(value)
+      return true
+    }
+  } catch (_error) {
+    // Figma plugin iframes can reject Clipboard API access, so fall through.
+  }
+
+  const textarea = document.createElement("textarea")
+
+  textarea.value = value
+  textarea.setAttribute("readonly", "")
+  textarea.style.position = "fixed"
+  textarea.style.left = "-9999px"
+  textarea.style.top = "0"
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+
+  try {
+    return document.execCommand("copy")
+  } catch (_error) {
+    return false
+  } finally {
+    document.body.removeChild(textarea)
+  }
 }

@@ -6,6 +6,7 @@ import ExportPreviewDrawer from "./ExportPreviewDrawer"
 import FramePreview from "./FramePreview"
 import { JsonViewerOverlay, JsonViewerSlider } from "./JsonViewer"
 import LayerPanel from "./LayerPanel"
+import { findNode } from "./editorModel"
 import type { FigmaSerializedFrame } from "../frameSchema"
 
 type EditorProps = {
@@ -13,6 +14,10 @@ type EditorProps = {
   targetDevice: TargetDevice
   screenWidth: number
   layoutRules: LayoutRulesState
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
   onFrameChange: (frame: FigmaSerializedFrame) => void
 }
 
@@ -21,6 +26,10 @@ export default function Editor({
   targetDevice,
   screenWidth,
   layoutRules,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onFrameChange
 }: EditorProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
@@ -31,6 +40,16 @@ export default function Editor({
     setSelectedNodeId(frame?.id ?? null)
   }, [frame?.id])
 
+  useEffect(() => {
+    if (frame == null || selectedNodeId == null) {
+      return
+    }
+
+    if (findNode(frame, selectedNodeId) == null) {
+      setSelectedNodeId(frame.id)
+    }
+  }, [frame, selectedNodeId])
+
   if (frame == null) {
     return <EmptyEditorState />
   }
@@ -38,7 +57,13 @@ export default function Editor({
   return (
     <section class="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_320px] bg-[#f6f7fb]">
       <div class="relative flex min-w-0 flex-col">
-        <EditorHeader frame={frame} />
+        <EditorHeader
+          frame={frame}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={onUndo}
+          onRedo={onRedo}
+        />
 
         <div class="relative min-h-0 flex-1 overflow-hidden">
           <section class="relative h-full min-h-0 overflow-hidden pb-12">
@@ -108,7 +133,19 @@ function EmptyEditorState() {
   )
 }
 
-function EditorHeader({ frame }: { frame: FigmaSerializedFrame }) {
+function EditorHeader({
+  frame,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo
+}: {
+  frame: FigmaSerializedFrame
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
+}) {
   return (
     <header class="flex h-16 shrink-0 items-center justify-between border-b border-[#e5e7eb] bg-white px-6">
       <div class="min-w-0">
@@ -119,6 +156,44 @@ function EditorHeader({ frame }: { frame: FigmaSerializedFrame }) {
           {frame.type} · {Math.round(frame.geometry.width)} x {Math.round(frame.geometry.height)} px · schema v{frame.schemaVersion}
         </p>
       </div>
+
+      <div class="flex shrink-0 items-center gap-2">
+        <HistoryButton
+          label="Undo"
+          disabled={!canUndo}
+          onClick={onUndo}
+        />
+        <HistoryButton
+          label="Redo"
+          disabled={!canRedo}
+          onClick={onRedo}
+        />
+      </div>
     </header>
+  )
+}
+
+function HistoryButton({
+  label,
+  disabled,
+  onClick
+}: {
+  label: string
+  disabled: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      class={`h-8 rounded-lg border px-3 text-xs font-bold transition ${
+        disabled
+          ? "cursor-not-allowed border-[#e5e7eb] bg-gray-50 text-gray-300"
+          : "border-[#cbd5e1] bg-white text-gray-700 hover:border-[#0f766e] hover:text-[#0f766e]"
+      }`}
+    >
+      {label}
+    </button>
   )
 }

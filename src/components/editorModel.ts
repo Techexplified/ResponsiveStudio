@@ -343,8 +343,8 @@ export function applyFlexLayoutToNode<T extends FigmaSerializedNode>(node: T): T
     const crossEndMargin = isHorizontal ? margin.bottom : margin.right
     const childMainSize = isHorizontal ? child.geometry.width : child.geometry.height
     const childCrossSize = isHorizontal ? child.geometry.height : child.geometry.width
-    const fillsMainAxis = getNodeAxisSizing(child, isHorizontal ? "horizontal" : "vertical") === "FILL"
-    const fillsCrossAxis = getNodeAxisSizing(child, isHorizontal ? "vertical" : "horizontal") === "FILL"
+    const fillsMainAxis = getNodeAxisSizing(child, isHorizontal ? "horizontal" : "vertical", layoutMode) === "FILL"
+    const fillsCrossAxis = getNodeAxisSizing(child, isHorizontal ? "vertical" : "horizontal", layoutMode) === "FILL"
 
     return {
       child,
@@ -434,7 +434,8 @@ type AxisSizingMode = "FILL" | "HUG" | "FIXED" | null
 
 function getNodeAxisSizing(
   node: FigmaSerializedNode,
-  axis: "horizontal" | "vertical"
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = null
 ): AxisSizingMode {
   const layoutSizing = axis === "horizontal"
     ? node.layout.layoutSizingHorizontal
@@ -456,7 +457,11 @@ function getNodeAxisSizing(
     return "FIXED"
   }
 
-  if (axis === "horizontal" && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0) {
+  if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return "FILL"
+  }
+
+  if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
     return "FILL"
   }
 
@@ -467,6 +472,24 @@ function axisMatchesPrimaryAxis(node: FigmaSerializedNode, axis: "horizontal" | 
   return axis === "horizontal"
     ? node.layout.layoutMode === "HORIZONTAL"
     : node.layout.layoutMode === "VERTICAL"
+}
+
+function axisMatchesPrimaryParentAxis(
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  axis: "horizontal" | "vertical"
+): boolean {
+  return axis === "horizontal"
+    ? parentLayoutMode === "HORIZONTAL"
+    : parentLayoutMode === "VERTICAL"
+}
+
+function axisMatchesCrossAxis(
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  axis: "horizontal" | "vertical"
+): boolean {
+  return axis === "horizontal"
+    ? parentLayoutMode === "VERTICAL"
+    : parentLayoutMode === "HORIZONTAL"
 }
 
 function getMainOffset(

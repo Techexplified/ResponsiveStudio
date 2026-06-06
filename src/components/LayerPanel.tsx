@@ -43,6 +43,8 @@ export default function LayerPanel({
   )
   const [lastSelectedLayerId, setLastSelectedLayerId] = useState<string | null>(selectedNodeId)
   const selectedNode = selectedNodeId == null ? null : findNode(frame, selectedNodeId)
+  const selectedParentNode = selectedNodeId == null ? null : findParentNode(frame, selectedNodeId)
+  const selectedParentLayoutMode = getLayoutMode(selectedParentNode)
   const visibleLayerIds = getVisibleLayerIds(frame)
 
   useEffect(() => {
@@ -349,6 +351,7 @@ export default function LayerPanel({
             <div class="max-h-[45vh] overflow-auto">
               <FlexLayoutPanel
                 node={selectedNode}
+                parentLayoutMode={selectedParentLayoutMode}
                 onChange={(nextNode) => {
                   const laidOutNode = applyFlexLayoutToNode(nextNode)
                   const frameWithUpdatedNode = updateNode(frame, laidOutNode.id, () => laidOutNode)
@@ -376,6 +379,14 @@ export default function LayerPanel({
       )}
     </aside>
   )
+}
+
+function getLayoutMode(node: FigmaSerializedNode | null): "HORIZONTAL" | "VERTICAL" | null {
+  if (node?.layout.layoutMode === "HORIZONTAL" || node?.layout.layoutMode === "VERTICAL") {
+    return node.layout.layoutMode
+  }
+
+  return null
 }
 
 function LayerTools({

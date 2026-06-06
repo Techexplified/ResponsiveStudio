@@ -27,7 +27,7 @@ export default function ExportFramePanel({
         appliedAt: snapshot.appliedAt,
         target: {
           device: snapshot.settings.targetDevice,
-          width: snapshot.settings.screenWidth
+          referenceWidth: snapshot.settings.screenWidth
         },
         source: {
           importedWidth: snapshot.settings.sourceWidth
@@ -79,7 +79,7 @@ export default function ExportFramePanel({
           <section class="border-b border-[#e5e7eb] p-5">
             <div class="grid grid-cols-2 gap-3">
               <SummaryItem label="Target" value={snapshot.settings.targetDevice} />
-              <SummaryItem label="Width" value={`${snapshot.settings.screenWidth}px`} />
+              <SummaryItem label="Reference" value={`${snapshot.settings.screenWidth}px`} />
               <SummaryItem label="Imported" value={`${snapshot.settings.sourceWidth}px`} />
               <SummaryItem label="Source" value={snapshot.frame.name} />
               <SummaryItem label="Children" value={String(snapshot.frame.children.length)} />

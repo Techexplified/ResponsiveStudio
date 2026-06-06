@@ -6,13 +6,7 @@ import type { FigmaSerializedFrame } from "../frameSchema"
 
 export type TargetDevice = "mobile" | "tablet" | "desktop" | "custom"
 
-const fixedDeviceWidths: Record<Exclude<TargetDevice, "custom">, string> = {
-  mobile: "375",
-  tablet: "768",
-  desktop: "1440"
-}
-
-type ConversionOption = {
+export type ConversionOption = {
   id: string
   label: string
   description: string
@@ -28,35 +22,8 @@ export type ResponsiveGenerationSettings = {
   options: ConversionOption[]
 }
 
-
-export default function ResponsiveSidebar({
-  importedFrame,
-  importError,
-  targetDevice,
-  sourceWidth,
-  screenWidth,
-  layoutRules,
-  onTargetDeviceChange,
-  onSourceWidthChange,
-  onScreenWidthChange,
-  onLayoutRulesChange,
-  onClearFrame,
-  onGenerate
-}: {
-  importedFrame: FigmaSerializedFrame | null
-  importError: string
-  targetDevice: TargetDevice
-  sourceWidth: string
-  screenWidth: string
-  layoutRules: LayoutRulesState
-  onTargetDeviceChange: (value: TargetDevice) => void
-  onSourceWidthChange: (value: string) => void
-  onScreenWidthChange: (value: string) => void
-  onLayoutRulesChange: (value: LayoutRulesState) => void
-  onClearFrame: () => void
-  onGenerate: (settings: ResponsiveGenerationSettings) => void
-}) {
-  const [options, setOptions] = useState<ConversionOption[]>([
+export function createDefaultConversionOptions(): ConversionOption[] {
+  return [
     {
       id: "auto-stack",
       label: "Convert layout direction",
@@ -65,8 +32,8 @@ export default function ResponsiveSidebar({
     },
     {
       id: "resize-widths",
-      label: "Resize fixed widths",
-      description: "Make layers fit the target screen width.",
+      label: "Scale layout reference",
+      description: "Use relative width changes for generated layers.",
       enabled: true
     },
     {
@@ -81,7 +48,46 @@ export default function ResponsiveSidebar({
       description: "Generate beside the selected frame.",
       enabled: true
     }
-  ])
+  ]
+}
+
+
+export default function ResponsiveSidebar({
+  importedFrame,
+  importError,
+  jsonImportError,
+  isJsonImportedFrame,
+  targetDevice,
+  sourceWidth,
+  screenWidth,
+  layoutRules,
+  onTargetDeviceChange,
+  onSourceWidthChange,
+  onScreenWidthChange,
+  onLayoutRulesChange,
+  onClearFrame,
+  onImportJson,
+  onGenerate
+}: {
+  importedFrame: FigmaSerializedFrame | null
+  importError: string
+  jsonImportError: string
+  isJsonImportedFrame: boolean
+  targetDevice: TargetDevice
+  sourceWidth: string
+  screenWidth: string
+  layoutRules: LayoutRulesState
+  onTargetDeviceChange: (value: TargetDevice) => void
+  onSourceWidthChange: (value: string) => void
+  onScreenWidthChange: (value: string) => void
+  onLayoutRulesChange: (value: LayoutRulesState) => void
+  onClearFrame: () => void
+  onImportJson: (value: string) => boolean
+  onGenerate: (settings: ResponsiveGenerationSettings) => void
+}) {
+  const [options, setOptions] = useState<ConversionOption[]>(createDefaultConversionOptions)
+  const [isJsonImportOpen, setIsJsonImportOpen] = useState(false)
+  const [jsonImportValue, setJsonImportValue] = useState("")
   function toggleOption(id: string) {
     setOptions((current) =>
       current.map((option) =>
@@ -111,30 +117,38 @@ export default function ResponsiveSidebar({
       targetDevice,
       sourceWidth: Number(sourceWidth),
       screenWidth: Number(screenWidth),
-      sourceFrame: importedFrame,
+      sourceFrame: isJsonImportedFrame ? null : importedFrame,
       layoutRules,
       options
     }
 
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "generate-responsive-frame",
-          payload
-        }
-      },
-      "*"
-    )
+    if (!isJsonImportedFrame) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "generate-responsive-frame",
+            payload
+          }
+        },
+        "*"
+      )
+    } else if (importedFrame != null) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "create-export-frame-from-json",
+            payload: {
+              frame: importedFrame,
+              screenWidth: Number(screenWidth),
+              layoutRules
+            }
+          }
+        },
+        "*"
+      )
+    }
 
     onGenerate(payload)
-  }
-
-  function changeTargetDevice(nextTargetDevice: TargetDevice) {
-    onTargetDeviceChange(nextTargetDevice)
-
-    if (nextTargetDevice !== "custom") {
-      onScreenWidthChange(fixedDeviceWidths[nextTargetDevice])
-    }
   }
 
   return (
@@ -148,8 +162,23 @@ export default function ResponsiveSidebar({
           frame={importedFrame}
           error={importError}
           onImport={importSelectedFrame}
+          onToggleJsonImport={() => setIsJsonImportOpen((current) => !current)}
           onClear={onClearFrame}
         />
+
+        {isJsonImportOpen && (
+          <JsonImportCard
+            value={jsonImportValue}
+            error={jsonImportError}
+            onChange={setJsonImportValue}
+            onImport={() => {
+              if (onImportJson(jsonImportValue)) {
+                setJsonImportValue("")
+                setIsJsonImportOpen(false)
+              }
+            }}
+          />
+        )}
 
         <WidthInput
           className="mt-4"
@@ -163,17 +192,14 @@ export default function ResponsiveSidebar({
 
         <DeviceSelector
           value={targetDevice}
-          onChange={changeTargetDevice}
+          onChange={onTargetDeviceChange}
         />
 
-        {targetDevice === "custom" && (
-          <WidthInput
-            label="Screen Width"
-            value={screenWidth}
-            onChange={onScreenWidthChange}
-            presets={["375", "390", "414"]}
-          />
-        )}
+        <WidthInput
+          label="Reference Width"
+          value={screenWidth}
+          onChange={onScreenWidthChange}
+        />
 
         <StepTitle index={3} title="Layout Rules" className="mt-7" />
 
@@ -207,11 +233,13 @@ export default function ResponsiveSidebar({
           }`}
         >
           <span>✦</span>
-          Generate Responsive Frame
+          {isJsonImportedFrame ? "Update Export Wireframe" : "Generate Responsive Frame"}
         </button>
 
         <p class="mt-3 text-center text-xs leading-relaxed text-gray-500">
-          A new editable frame will be created next to your selected frame.
+          {isJsonImportedFrame
+            ? "The pasted JSON is the editable export wireframe."
+            : "A new editable frame will be created next to your selected frame."}
         </p>
       </div>
     </aside>
@@ -273,11 +301,13 @@ function SourceFrameCard({
   frame,
   error,
   onImport,
+  onToggleJsonImport,
   onClear
 }: {
   frame: FigmaSerializedFrame | null
   error: string
   onImport: () => void
+  onToggleJsonImport: () => void
   onClear: () => void
 }) {
   return (
@@ -324,6 +354,59 @@ function SourceFrameCard({
           </button>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={onToggleJsonImport}
+        class="mt-2 w-full rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-gray-600 transition hover:border-gray-300 hover:bg-white hover:text-gray-900"
+      >
+        Import JSON
+      </button>
+    </div>
+  )
+}
+
+function JsonImportCard({
+  value,
+  error,
+  onChange,
+  onImport
+}: {
+  value: string
+  error: string
+  onChange: (value: string) => void
+  onImport: () => void
+}) {
+  return (
+    <div class="mt-3 rounded-xl border border-[#e5e7eb] bg-gray-50 p-3">
+      <label class="mb-2 block text-xs font-bold text-gray-700">
+        JSON Import
+      </label>
+
+      <textarea
+        value={value}
+        onInput={(event) => onChange(event.currentTarget.value)}
+        class="h-32 w-full resize-none rounded-lg border border-[#d1d5db] bg-white p-3 font-mono text-[11px] leading-4 text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10"
+      />
+
+      {error !== "" && (
+        <p class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={onImport}
+        disabled={value.trim() === ""}
+        class={`mt-2 h-9 w-full rounded-lg text-xs font-bold transition ${
+          value.trim() === ""
+            ? "cursor-not-allowed bg-gray-200 text-gray-400"
+            : "bg-[#0f766e] text-white hover:bg-[#115e59]"
+        }`}
+      >
+        Import JSON
+      </button>
     </div>
   )
 }
@@ -338,12 +421,11 @@ function DeviceSelector({
   const devices: Array<{
     id: TargetDevice
     label: string
-    widthLabel: string
   }> = [
-    { id: "mobile", label: "Mobile", widthLabel: `${fixedDeviceWidths.mobile}px` },
-    { id: "tablet", label: "Tablet", widthLabel: `${fixedDeviceWidths.tablet}px` },
-    { id: "desktop", label: "Desktop", widthLabel: `${fixedDeviceWidths.desktop}px` },
-    { id: "custom", label: "Custom", widthLabel: "Manual" }
+    { id: "mobile", label: "Mobile" },
+    { id: "tablet", label: "Tablet" },
+    { id: "desktop", label: "Desktop" },
+    { id: "custom", label: "Custom" }
   ]
 
   return (
@@ -378,15 +460,8 @@ function DeviceSelector({
                 }`}
               />
             </span>
-            <span class="min-w-0">
-              <span class="block truncate">
-                {device.label}
-              </span>
-              <span class={`block truncate text-[10px] ${
-                isSelected ? "text-[#374151]" : "text-gray-400"
-              }`}>
-                {device.widthLabel}
-              </span>
+            <span class="min-w-0 truncate">
+              {device.label}
             </span>
           </button>
         )
@@ -399,14 +474,12 @@ function WidthInput({
   label,
   value,
   onChange,
-  presets = [],
   disabled = false,
   className = "mt-4"
 }: {
   label: string
   value: string
   onChange: (value: string) => void
-  presets?: string[]
   disabled?: boolean
   className?: string
 }) {
@@ -431,24 +504,6 @@ function WidthInput({
         </div>
       </div>
 
-      {presets.length > 0 && (
-        <div class="mt-3 grid grid-cols-3 gap-2">
-        {presets.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => onChange(preset)}
-            class={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${
-              value === preset
-                ? "border-[#d97706] bg-[#fbbf24] text-[#111827] shadow-sm"
-                : "border-[#cbd5e1] bg-[#f8fafc] text-gray-500 hover:border-gray-300 hover:bg-white"
-            }`}
-          >
-            {preset}px
-          </button>
-        ))}
-        </div>
-      )}
     </div>
   )
 }

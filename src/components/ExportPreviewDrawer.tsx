@@ -78,7 +78,7 @@ export default function ExportPreviewDrawer({
               Export Preview
             </h3>
             <p class="mt-0.5 text-[11px] text-gray-500">
-              {getDeviceLabel(targetDevice)} · {Math.round(screenWidth)}px
+              {getDeviceLabel(targetDevice)} · {Math.round(screenWidth)}px ref
             </p>
           </div>
         ) : (
@@ -235,7 +235,7 @@ function GeneratedPreview({
                 </span>
                 <span class="text-gray-300">·</span>
                 <span class="font-semibold text-gray-500">
-                  {Math.round(reviewWidth)}px
+                  {Math.round(reviewWidth)}px ref
                 </span>
               </div>
               <div class="flex shrink-0 items-center gap-2">
@@ -510,7 +510,7 @@ function ExportInspectorPanel({
       <div class="min-h-0 flex-1 overflow-auto p-3">
         <InspectorSection title={isFrame ? "Canvas" : "Export Box"}>
           <div class="grid grid-cols-2 gap-2">
-            <InspectorMetric label="Width" value={`${Math.round(isFrame ? reviewWidth : node.geometry.width)}px`} />
+            <InspectorMetric label={isFrame ? "Reference" : "Width"} value={`${Math.round(isFrame ? reviewWidth : node.geometry.width)}px`} />
             <InspectorMetric label="Height" value={`${Math.round(renderedHeight)}px`} />
             <InspectorMetric label="X" value={`${Math.round(node.geometry.x)}px`} />
             <InspectorMetric label="Y" value={`${Math.round(node.geometry.y)}px`} />
@@ -763,7 +763,8 @@ function arrangeChildrenVertically(
     const childWidth = shouldFillAxis(
       child,
       "horizontal",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH"
+      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      "VERTICAL"
     )
       ? contentWidth
       : Math.min(child.geometry.width, contentWidth)
@@ -779,7 +780,7 @@ function arrangeChildrenVertically(
       child,
       childWidth,
       baseHeight: getResponsiveNodeHeight(childForWidth, layoutRules, reviewWidth),
-      fillsHeight: shouldFillAxis(child, "vertical", false)
+      fillsHeight: shouldFillAxis(child, "vertical", false, "VERTICAL")
     }
   })
   const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length
@@ -839,11 +840,12 @@ function arrangeChildrenHorizontally(
   const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1)
   const childLayouts = node.children.map((child) => ({
     child,
-    fillsWidth: shouldFillAxis(child, "horizontal", false),
+    fillsWidth: shouldFillAxis(child, "horizontal", false, "HORIZONTAL"),
     childHeight: shouldFillAxis(
       child,
       "vertical",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH"
+      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      "HORIZONTAL"
     )
       ? contentHeight
       : child.geometry.height
@@ -981,16 +983,18 @@ type AxisSizingMode = "FILL" | "HUG" | "FIXED" | null
 function shouldFillAxis(
   node: FigmaSerializedNode,
   axis: "horizontal" | "vertical",
-  defaultFill: boolean
+  defaultFill: boolean,
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = null
 ): boolean {
-  const sizingMode = getNodeAxisSizing(node, axis)
+  const sizingMode = getNodeAxisSizing(node, axis, parentLayoutMode)
 
   return sizingMode === "FILL" || (sizingMode == null && defaultFill)
 }
 
 function getNodeAxisSizing(
   node: FigmaSerializedNode,
-  axis: "horizontal" | "vertical"
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = null
 ): AxisSizingMode {
   const layoutSizing = axis === "horizontal"
     ? node.layout.layoutSizingHorizontal
@@ -1012,7 +1016,11 @@ function getNodeAxisSizing(
     return "FIXED"
   }
 
-  if (axis === "horizontal" && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0) {
+  if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return "FILL"
+  }
+
+  if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
     return "FILL"
   }
 
@@ -1023,6 +1031,24 @@ function axisMatchesPrimaryAxis(node: FigmaSerializedNode, axis: "horizontal" | 
   return axis === "horizontal"
     ? node.layout.layoutMode === "HORIZONTAL"
     : node.layout.layoutMode === "VERTICAL"
+}
+
+function axisMatchesPrimaryParentAxis(
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  axis: "horizontal" | "vertical"
+): boolean {
+  return axis === "horizontal"
+    ? parentLayoutMode === "HORIZONTAL"
+    : parentLayoutMode === "VERTICAL"
+}
+
+function axisMatchesCrossAxis(
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  axis: "horizontal" | "vertical"
+): boolean {
+  return axis === "horizontal"
+    ? parentLayoutMode === "VERTICAL"
+    : parentLayoutMode === "HORIZONTAL"
 }
 
 function getEffectiveLayoutRules(

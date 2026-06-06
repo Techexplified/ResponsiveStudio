@@ -190,3 +190,21 @@ export type UiToPluginMessage =
         }>
       }
     }
+  | {
+      type: "create-export-frame-from-json"
+      payload: {
+        frame: FigmaSerializedFrame
+        screenWidth: number
+        layoutRules: {
+          conversionDirection: ResponsiveConversionDirection
+          rowToColumnMode: ResponsiveConversionMode
+          rowToColumnBreakpoint: number
+          stackGap: number
+          outputPadding: number
+          stackAlignment: ResponsiveStackAlignment
+          textScaleMode: "preserve" | "scale" | "clamp"
+          minimumTextSize: number
+          tightenLineHeight: boolean
+        }
+      }
+    }

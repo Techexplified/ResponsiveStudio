@@ -92,6 +92,7 @@ declare const styles: {
   readonly "focus:ring-[#5b35f5]/10": string;
   readonly "font-bold": string;
   readonly "font-medium": string;
+  readonly "font-mono": string;
   readonly "font-semibold": string;
   readonly "from-[#ede9ff]": string;
   readonly "from-orange-200": string;
@@ -135,6 +136,7 @@ declare const styles: {
   readonly "h-16": string;
   readonly "h-2": string;
   readonly "h-20": string;
+  readonly "h-32": string;
   readonly "h-4": string;
   readonly "h-5": string;
   readonly "h-6": string;
@@ -161,7 +163,9 @@ declare const styles: {
   readonly "hover:bg-white": string;
   readonly "hover:bg-white/5": string;
   readonly "hover:bg-white/70": string;
+  readonly "hover:border-[#0f766e]": string;
   readonly "hover:border-gray-300": string;
+  readonly "hover:text-[#0f766e]": string;
   readonly "hover:text-gray-700": string;
   readonly "hover:text-gray-900": string;
   readonly "hover:underline": string;
@@ -172,6 +176,7 @@ declare const styles: {
   readonly "justify-between": string;
   readonly "justify-center": string;
   readonly "justify-start": string;
+  readonly "leading-4": string;
   readonly "leading-5": string;
   readonly "leading-6": string;
   readonly "leading-relaxed": string;
@@ -256,6 +261,7 @@ declare const styles: {
   readonly "py-6": string;
   readonly "relative": string;
   readonly "resize": string;
+  readonly "resize-none": string;
   readonly "right-0": string;
   readonly "right-12": string;
   readonly "right-3": string;

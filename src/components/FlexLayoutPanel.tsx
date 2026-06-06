@@ -4,6 +4,7 @@ import type { FigmaSerializedNode } from "../frameSchema"
 
 type FlexLayoutPanelProps = {
   node: FigmaSerializedNode
+  parentLayoutMode: Direction | null
   onChange: (node: FigmaSerializedNode) => void
 }
 
@@ -14,6 +15,7 @@ type SizingMode = "FILL" | "HUG" | "FIXED"
 
 export default function FlexLayoutPanel({
   node,
+  parentLayoutMode,
   onChange
 }: FlexLayoutPanelProps) {
   const layout = node.layout
@@ -48,7 +50,12 @@ export default function FlexLayoutPanel({
   }
 
   function updateWidthSizing(sizingMode: SizingMode) {
-    updateLayout({
+    updateLayout(normalizeChildSizingForParent({
+      widthSizing: sizingMode,
+      heightSizing: getCurrentHeightSizing()
+    }, {
+      parentLayoutMode
+    }, {
       layoutSizingHorizontal: sizingMode,
       ...(isContainer && layout.layoutMode === "HORIZONTAL"
         ? { primaryAxisSizingMode: toAxisSizingMode(sizingMode) }
@@ -56,11 +63,16 @@ export default function FlexLayoutPanel({
       ...(isContainer && layout.layoutMode !== "HORIZONTAL"
         ? { counterAxisSizingMode: toAxisSizingMode(sizingMode) }
         : {})
-    })
+    }))
   }
 
   function updateHeightSizing(sizingMode: SizingMode) {
-    updateLayout({
+    updateLayout(normalizeChildSizingForParent({
+      widthSizing: getCurrentWidthSizing(),
+      heightSizing: sizingMode
+    }, {
+      parentLayoutMode
+    }, {
       layoutSizingVertical: sizingMode,
       ...(isContainer && layout.layoutMode === "VERTICAL"
         ? { primaryAxisSizingMode: toAxisSizingMode(sizingMode) }
@@ -68,16 +80,25 @@ export default function FlexLayoutPanel({
       ...(isContainer && layout.layoutMode !== "VERTICAL"
         ? { counterAxisSizingMode: toAxisSizingMode(sizingMode) }
         : {})
-    })
+    }))
   }
 
   function stretchToParent() {
-    updateLayout({
-      layoutAlign: "STRETCH",
-      layoutGrow: 1,
-      layoutSizingHorizontal: "FILL",
-      layoutSizingVertical: "FILL"
-    })
+    updateWidthSizing("FILL")
+  }
+
+  function getCurrentWidthSizing(): SizingMode {
+    return getSizingMode(
+      layout.layoutSizingHorizontal,
+      layout.layoutMode === "HORIZONTAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode
+    )
+  }
+
+  function getCurrentHeightSizing(): SizingMode {
+    return getSizingMode(
+      layout.layoutSizingVertical,
+      layout.layoutMode === "VERTICAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode
+    )
   }
 
   return (
@@ -150,10 +171,7 @@ export default function FlexLayoutPanel({
         <div class="grid grid-cols-2 gap-2">
           <SelectField<SizingMode>
             label="Width"
-            value={getSizingMode(
-              layout.layoutSizingHorizontal,
-              layout.layoutMode === "HORIZONTAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode
-            )}
+            value={getCurrentWidthSizing()}
             options={[
               { value: "FILL", label: "Fill" },
               { value: "HUG", label: "Hug" },
@@ -164,10 +182,7 @@ export default function FlexLayoutPanel({
 
           <SelectField<SizingMode>
             label="Height"
-            value={getSizingMode(
-              layout.layoutSizingVertical,
-              layout.layoutMode === "VERTICAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode
-            )}
+            value={getCurrentHeightSizing()}
             options={[
               { value: "FILL", label: "Fill" },
               { value: "HUG", label: "Hug" },
@@ -183,7 +198,7 @@ export default function FlexLayoutPanel({
             onClick={stretchToParent}
             class="h-11 w-full rounded-xl border border-[#0f766e] bg-[#ecfdf5] px-4 text-sm font-bold text-[#0f766e] transition hover:bg-[#ccfbf1]"
           >
-            Stretch to parent
+            Stretch width to parent
           </button>
         )}
 
@@ -237,6 +252,35 @@ function getSizingMode(
 
 function toAxisSizingMode(sizingMode: SizingMode): "AUTO" | "FIXED" {
   return sizingMode === "HUG" ? "AUTO" : "FIXED"
+}
+
+function normalizeChildSizingForParent(
+  sizing: {
+    widthSizing: SizingMode
+    heightSizing: SizingMode
+  },
+  context: {
+    parentLayoutMode: Direction | null
+  },
+  nextLayout: Partial<FigmaSerializedNode["layout"]>
+): Partial<FigmaSerializedNode["layout"]> {
+  if (context.parentLayoutMode === "HORIZONTAL") {
+    return {
+      ...nextLayout,
+      layoutGrow: sizing.widthSizing === "FILL" ? 1 : 0,
+      layoutAlign: sizing.heightSizing === "FILL" ? "STRETCH" : "INHERIT"
+    }
+  }
+
+  if (context.parentLayoutMode === "VERTICAL") {
+    return {
+      ...nextLayout,
+      layoutGrow: sizing.heightSizing === "FILL" ? 1 : 0,
+      layoutAlign: sizing.widthSizing === "FILL" ? "STRETCH" : "INHERIT"
+    }
+  }
+
+  return nextLayout
 }
 
 function ControlGroup({
