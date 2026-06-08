@@ -1,1 +1,1382 @@
-var C=Object.defineProperty,xt=Object.defineProperties,At=Object.getOwnPropertyDescriptor,St=Object.getOwnPropertyDescriptors,Et=Object.getOwnPropertyNames,X=Object.getOwnPropertySymbols;var _=Object.prototype.hasOwnProperty,zt=Object.prototype.propertyIsEnumerable;var Z=(t,e,i)=>e in t?C(t,e,{enumerable:!0,configurable:!0,writable:!0,value:i}):t[e]=i,d=(t,e)=>{for(var i in e||(e={}))_.call(e,i)&&Z(t,i,e[i]);if(X)for(var i of X(e))zt.call(e,i)&&Z(t,i,e[i]);return t},x=(t,e)=>xt(t,St(e));var v=(t,e)=>()=>(t&&(e=t(t=0)),e);var Tt=(t,e)=>{for(var i in e)C(t,i,{get:e[i],enumerable:!0})},Nt=(t,e,i,n)=>{if(e&&typeof e=="object"||typeof e=="function")for(let r of Et(e))!_.call(t,r)&&r!==i&&C(t,r,{get:()=>e[r],enumerable:!(n=At(e,r))||n.enumerable});return t};var It=t=>Nt(C({},"__esModule",{value:!0}),t);function k(t,e){if(typeof __html__=="undefined")throw new Error("No UI defined");let i=`<div id="create-figma-plugin"></div><script>document.body.classList.add('theme-${figma.editorType}');const __FIGMA_COMMAND__='${typeof figma.command=="undefined"?"":figma.command}';const __SHOW_UI_DATA__=${JSON.stringify(typeof e=="undefined"?{}:e)};${__html__}</script>`;figma.showUI(i,x(d({},t),{themeColors:typeof t.themeColors=="undefined"?!0:t.themeColors}))}var $=v(()=>{});var j=v(()=>{$()});var pt={};Tt(pt,{default:()=>bt});function bt(){k({height:1e3,width:1400}),figma.ui.onmessage=t=>{if(t.type==="import-selected-frame"){Rt();return}if(t.type==="generate-responsive-frame"){Mt(t.payload).catch(e=>{let i=e instanceof Error?e.message:"Could not generate responsive frame.";figma.notify(i)});return}t.type==="create-export-frame-from-json"&&Ft(t.payload).catch(e=>{let i=e instanceof Error?e.message:"Could not create export frame from JSON.";figma.notify(i)})}}function Rt(){let[t]=figma.currentPage.selection;if(t==null){F({type:"import-error",message:"Select a Figma frame, component, or instance first."});return}if(!M(t)){F({type:"import-error",message:"The selected layer is not a frame. Select a frame, component, or instance."});return}if(!D(t)){F({type:"import-error",message:"Select an Auto Layout frame, component, or instance. Responsive conversion needs Figma Auto Layout data."});return}F({type:"frame-imported",payload:he(t)}),figma.notify(`Imported "${t.name}"`)}async function Mt(t){let e=await Ct(t);if(e==null){figma.notify("Import the source frame again before generating.");return}let i=S(t.sourceWidth,1,1e4),n=S(t.screenWidth,1,1e4),r=x(d({},t),{sourceWidth:i,screenWidth:n}),o=e.clone();o.name=`${e.name} / ${tt(t.targetDevice)}`,o.x=e.x+e.width+80,o.y=e.y,await st(o,r,i,re(t.sourceFrame),""),figma.currentPage.selection=[o],figma.viewport.scrollAndZoomIntoView([o]),figma.notify(`Generated ${tt(t.targetDevice)} responsive frame from ${Math.round(n)}px reference.`)}async function Ct(t){if(t.sourceFrame!=null){let i=await figma.getNodeByIdAsync(t.sourceFrame.id);if(i!=null&&M(i))return i}let[e]=figma.currentPage.selection;return e!=null&&M(e)?e:null}async function Ft(t){let e=Lt(t),i=await ut(e,!0);if(!M(i)){figma.notify("JSON export must resolve to a frame.");return}i.name=e.name,i.x=$t(e.geometry.width),i.y=figma.viewport.center.y-e.geometry.height/2,figma.currentPage.appendChild(i),figma.currentPage.selection=[i],figma.viewport.scrollAndZoomIntoView([i]),figma.notify(`Created export frame "${i.name}" from JSON.`)}function Lt(t){let e=Number.isFinite(t.screenWidth)&&t.screenWidth>0?t.screenWidth:t.frame.geometry.width,i=Ht(t.frame,e,t.layoutRules),n=Math.max(Math.min(t.frame.geometry.height,760),i.reduce((r,o)=>Math.max(r,o.y+o.height),0)+24);return x(d({},R(x(d({},t.frame),{layout:lt(t.frame),children:i.map(r=>rt({node:r.node,origin:r.sourceBounds,scale:r.scale,layoutRules:t.layoutRules,reviewWidth:e,x:r.x,y:r.y,width:r.width,height:r.height}))}),0,0,e,n)),{type:t.frame.type,schemaVersion:1,importedAt:t.frame.importedAt})}function Ht(t,e,i){let n=i.outputPadding,r=Math.max(1,e-n*2),o=t.children.filter(u=>u.visible).sort((u,l)=>u.geometry.y-l.geometry.y||u.geometry.x-l.geometry.x),a=n;return o.map(u=>{let l=u.geometry,f=r/Math.max(l.width,1),m=Math.max(1,H(u,i,e)*f),c={node:u,x:n,y:a,width:r,height:m,sourceBounds:l,scale:f};return a+=m+i.stackGap,c})}function rt({node:t,origin:e,scale:i,layoutRules:n,reviewWidth:r,x:o=(t.geometry.x-e.x)*i,y:a=(t.geometry.y-e.y)*i,width:u=t.geometry.width*i,height:l=H(t,n,r)*i}){let f=ot(t,n,r),m=t.text==null?void 0:x(d({},t.text),{fontSize:typeof t.text.fontSize=="number"?Pt(t.text.fontSize,i,n):t.text.fontSize,lineHeight:Wt(t.text.lineHeight,i)}),c=x(d({},t.style),{strokeWeight:typeof t.style.strokeWeight=="number"?t.style.strokeWeight*i:t.style.strokeWeight,cornerRadius:typeof t.style.cornerRadius=="number"?t.style.cornerRadius*i:t.style.cornerRadius});return R(x(d({},t),{layout:lt(t),style:c,text:m,children:f.filter(g=>g.node.visible).map(g=>rt({node:g.node,origin:{x:0,y:0},scale:i,layoutRules:n,reviewWidth:r}))}),o,a,u,l)}function H(t,e,i){var a;if(t.children.length===0)return t.geometry.height;let r=ot(t,e,i).reduce((u,l)=>Math.max(u,l.node.geometry.y+H(l.node,e,i)),0),o=(a=t.layout.padding)!=null?a:{top:0,right:0,bottom:0,left:0};return at(t,"vertical")==="HUG"?Math.max(1,r+o.bottom):Math.max(t.geometry.height,r)}function ot(t,e,i){let n=Jt(t,e),r=vt(t,n,i),o=r!=null?r:kt(t),a=r==null?Gt(t,n):n;return o==null?t.children.map(u=>({node:u})):o==="HORIZONTAL"?Ot(t,e,a,i):wt(t,e,a,i)}function wt(t,e,i,n){var p;let r=(p=t.layout.padding)!=null?p:{top:0,right:0,bottom:0,left:0},o=r.top,a=Math.max(0,t.geometry.width-r.left-r.right),u=Math.max(0,t.geometry.height-r.top-r.bottom),l=i.stackGap*Math.max(0,t.children.length-1),f=t.children.map(s=>{let h=L(s,"horizontal",i.stackAlignment==="stretch"||s.layout.layoutAlign==="STRETCH","VERTICAL")?a:Math.min(s.geometry.width,a),E=R(s,s.geometry.x,s.geometry.y,h,s.geometry.height);return{child:s,childWidth:h,baseHeight:H(E,e,n),fillsHeight:L(s,"vertical",!1,"VERTICAL")}}),m=f.filter(s=>s.fillsHeight).length,c=f.reduce((s,h)=>h.fillsHeight?s:s+h.baseHeight,0),g=m===0?0:Math.max(1,(u-l-c)/m);return f.map(s=>{let h=s.child,E=s.childWidth,b=s.fillsHeight?g:s.baseHeight,w=Bt(i.stackAlignment,r.left,a,E),O=R(h,w,o,E,b);return o+=b+i.stackGap,{node:O}})}function Ot(t,e,i,n){var p;let r=(p=t.layout.padding)!=null?p:{top:0,right:0,bottom:0,left:0},o=r.left,a=Math.max(0,t.geometry.width-r.left-r.right),u=Math.max(0,t.geometry.height-r.top-r.bottom),l=i.stackGap*Math.max(0,t.children.length-1),f=t.children.map(s=>({child:s,fillsWidth:L(s,"horizontal",!1,"HORIZONTAL"),childHeight:L(s,"vertical",i.stackAlignment==="stretch"||s.layout.layoutAlign==="STRETCH","HORIZONTAL")?u:s.geometry.height})),m=f.filter(s=>s.fillsWidth).length,c=f.reduce((s,h)=>h.fillsWidth?s:s+h.child.geometry.width,0),g=m===0?0:Math.max(1,(a-l-c)/m);return f.map(s=>{let h=s.child,E=s.fillsWidth?g:h.geometry.width,b=s.childHeight,w=Dt(i.stackAlignment,r.top,u,b),O=R(h,o,w,E,b);return o+=E+i.stackGap,{node:O}})}function vt(t,e,i){return e.rowToColumnMode==="always"?Y(t,e):e.rowToColumnMode==="never"?null:(e.conversionDirection==="row-to-column"?i<=e.rowToColumnBreakpoint:i>=e.rowToColumnBreakpoint)?Y(t,e):null}function Y(t,e){return e.conversionDirection==="row-to-column"?t.layout.layoutMode==="HORIZONTAL"?"VERTICAL":null:t.layout.layoutMode==="VERTICAL"?"HORIZONTAL":null}function kt(t){return t.layout.layoutMode==="HORIZONTAL"||t.layout.layoutMode==="VERTICAL"?t.layout.layoutMode:null}function Gt(t,e){var i;return x(d({},e),{stackGap:(i=t.layout.itemSpacing)!=null?i:e.stackGap,stackAlignment:Vt(t)})}function Vt(t){return t.layout.counterAxisAlignItems==="CENTER"||t.layout.counterAxisAlignItems==="BASELINE"?"center":"start"}function Jt(t,e){var n;let i=(n=t.responsive)==null?void 0:n.nodeRule;return(i==null?void 0:i.enabled)===!0?{conversionDirection:i.conversionDirection,rowToColumnMode:i.rowToColumnMode,rowToColumnBreakpoint:i.rowToColumnBreakpoint,stackGap:i.stackGap,stackAlignment:i.stackAlignment}:{conversionDirection:e.conversionDirection,rowToColumnMode:e.rowToColumnMode,rowToColumnBreakpoint:e.rowToColumnBreakpoint,stackGap:e.stackGap,stackAlignment:e.stackAlignment}}function L(t,e,i,n=null){let r=at(t,e,n);return r==="FILL"||r==null&&i}function at(t,e,i=null){let n=e==="horizontal"?t.layout.layoutSizingHorizontal:t.layout.layoutSizingVertical;if(n==="FILL"||n==="HUG"||n==="FIXED")return n;let r=ft(t,e)?t.layout.primaryAxisSizingMode:t.layout.counterAxisSizingMode;return r==="AUTO"?"HUG":r==="FIXED"?"FIXED":i!=null&&t.layout.layoutAlign==="STRETCH"&&W(i,e)||i!=null&&typeof t.layout.layoutGrow=="number"&&t.layout.layoutGrow>0&&P(i,e)?"FILL":null}function Pt(t,e,i){let n=t*e;return i.textScaleMode==="preserve"?Math.max(8,n):i.textScaleMode==="scale"?Math.max(i.minimumTextSize,n):Math.max(i.minimumTextSize,Math.min(t,n))}function Wt(t,e){let i=J(t);return i!=null&&i.unit==="PIXELS"&&typeof i.value=="number"?x(d({},i),{value:i.value*e}):t}function Bt(t,e,i,n){return t==="center"?e+Math.max(0,(i-n)/2):e}function Dt(t,e,i,n){return t==="center"?e+Math.max(0,(i-n)/2):e}function lt(t){return x(d({},t.layout),{isAutoLayout:!1,autoLayoutDirection:"NONE",layoutMode:"NONE",layoutAlign:"INHERIT",layoutGrow:0,layoutSizingHorizontal:"FIXED",layoutSizingVertical:"FIXED"})}function R(t,e,i,n,r){let o=A(e),a=A(i),u=Math.max(1,A(n)),l=Math.max(1,A(r)),f=U(o,a,u,l);return x(d({},t),{geometry:x(d({},t.geometry),{x:o,y:a,width:u,height:l,absoluteBounds:f,parentRelativeBounds:f,rootRelativeBounds:f})})}async function ut(t,e=!1){let i=await Ut(t);if(Xt(i,t,e),I(i))for(let n of t.children){let r=await ut(n);i.appendChild(r)}return i}async function Ut(t){var e;if(t.type==="TEXT"){let i=figma.createText();return await Zt(i,t),i}return t.type==="FRAME"||t.type==="COMPONENT"||t.type==="INSTANCE"||t.type==="RESPONSIVE_GROUP"||((e=t.responsive)==null?void 0:e.isVirtualGroup)===!0||t.children.length>0?figma.createFrame():(t.type==="RECTANGLE",figma.createRectangle())}function Xt(t,e,i=!1){if(t.name=e.name,t.visible=e.visible,t.locked=e.locked,t.x=e.geometry.x,t.y=e.geometry.y,"rotation"in t&&(t.rotation=e.geometry.rotation),gt(t)&&t.resize(Math.max(1,e.geometry.width),Math.max(1,e.geometry.height)),"opacity"in t&&typeof e.style.opacity=="number"&&(t.opacity=S(e.style.opacity,0,1)),"fills"in t){let n=G(e.style.fills);n!=null?t.fills=n:i||(t.fills=[])}if("strokes"in t){let n=G(e.style.strokes);n!=null&&(t.strokes=n)}if("strokeWeight"in t&&typeof e.style.strokeWeight=="number"&&(t.strokeWeight=e.style.strokeWeight),"cornerRadius"in t&&typeof e.style.cornerRadius=="number"&&(t.cornerRadius=e.style.cornerRadius),"effects"in t){let n=G(e.style.effects);n!=null&&(t.effects=n)}_t(t,e)}async function Zt(t,e){var r,o,a,u,l,f,m,c,g,p,s,h,E;let i=(o=jt((r=e.text)==null?void 0:r.fontName))!=null?o:{family:"Inter",style:"Regular"};await figma.loadFontAsync(i),t.fontName=i,t.characters=(u=(a=e.text)==null?void 0:a.characters)!=null?u:"",typeof((l=e.text)==null?void 0:l.fontSize)=="number"&&(t.fontSize=e.text.fontSize),(((f=e.text)==null?void 0:f.textAlignHorizontal)==="LEFT"||((m=e.text)==null?void 0:m.textAlignHorizontal)==="CENTER"||((c=e.text)==null?void 0:c.textAlignHorizontal)==="RIGHT"||((g=e.text)==null?void 0:g.textAlignHorizontal)==="JUSTIFIED")&&(t.textAlignHorizontal=e.text.textAlignHorizontal),(((p=e.text)==null?void 0:p.textAlignVertical)==="TOP"||((s=e.text)==null?void 0:s.textAlignVertical)==="CENTER"||((h=e.text)==null?void 0:h.textAlignVertical)==="BOTTOM")&&(t.textAlignVertical=e.text.textAlignVertical);let n=Yt((E=e.text)==null?void 0:E.lineHeight);n!=null&&(t.lineHeight=n)}function _t(t,e){var i;if(B(t)){let n=e.layout.layoutMode==="HORIZONTAL"||e.layout.layoutMode==="VERTICAL"?e.layout.layoutMode:"NONE";if(t.layoutMode=n,n!=="NONE"){t.itemSpacing=S((i=e.layout.itemSpacing)!=null?i:0,0,1e3),t.primaryAxisAlignItems=qt(e.layout.primaryAxisAlignItems),t.counterAxisAlignItems=Kt(e.layout.counterAxisAlignItems),t.primaryAxisSizingMode=q(e.layout.primaryAxisSizingMode),t.counterAxisSizingMode=q(e.layout.counterAxisSizingMode);let r=e.layout.padding;r!=null&&(t.paddingTop=r.top,t.paddingRight=r.right,t.paddingBottom=r.bottom,t.paddingLeft=r.left)}}"layoutAlign"in t&&(e.layout.layoutAlign==="INHERIT"||e.layout.layoutAlign==="STRETCH")&&(t.layoutAlign=e.layout.layoutAlign),"layoutGrow"in t&&typeof e.layout.layoutGrow=="number"&&(t.layoutGrow=e.layout.layoutGrow),"layoutSizingHorizontal"in t&&K(e.layout.layoutSizingHorizontal)&&(t.layoutSizingHorizontal=e.layout.layoutSizingHorizontal),"layoutSizingVertical"in t&&K(e.layout.layoutSizingVertical)&&(t.layoutSizingVertical=e.layout.layoutSizingVertical)}function $t(t){let e=figma.currentPage.selection;return e.length>0?Math.max(...e.map(i=>y(i,"x",0)+y(i,"width",0)))+80:figma.viewport.center.x-t/2}function G(t){return Array.isArray(t)?t:null}function jt(t){let e=J(t);return e==null||typeof e.family!="string"||typeof e.style!="string"?null:{family:e.family,style:e.style}}function Yt(t){let e=J(t);return e==null||typeof e.unit!="string"?null:e.unit==="PIXELS"&&typeof e.value=="number"?{unit:"PIXELS",value:e.value}:e.unit==="PERCENT"&&typeof e.value=="number"?{unit:"PERCENT",value:e.value}:e.unit==="AUTO"?{unit:"AUTO"}:null}function qt(t){return t==="CENTER"||t==="MAX"||t==="SPACE_BETWEEN"?t:"MIN"}function Kt(t){return t==="CENTER"||t==="MAX"||t==="BASELINE"?t:"MIN"}function q(t){return t==="AUTO"?"AUTO":"FIXED"}function K(t){return t==="FIXED"||t==="HUG"||t==="FILL"}function J(t){return t!=null&&!Array.isArray(t)&&typeof t=="object"?t:null}async function st(t,e,i,n,r){var u;let o=n.get(r),a=ne(e,(u=o==null?void 0:o.responsive)==null?void 0:u.nodeRule);if(B(t)){let l=ee(t,e,a);l!=null&&(t.layoutMode=l,t.itemSpacing=S(a.stackGap,0,200),t.counterAxisAlignItems=oe(a.stackAlignment));let f=l!=null?l:ie(t);if(f!=null&&(ae(t,f,a.stackAlignment,o),le(t,f,a,o)),ge(t)){let m=S(e.layoutRules.outputPadding,0,200);t.paddingTop=m,t.paddingRight=m,t.paddingBottom=m,t.paddingLeft=m}}if(t.type==="TEXT"&&await Qt(t,e,i),I(t))for(let l=0;l<t.children.length;l+=1){let f=t.children[l];await st(f,e,i,n,r===""?String(l):`${r}/${l}`)}}async function Qt(t,e,i){if(typeof t.fontSize!="number")return;await te(t);let n=S(e.screenWidth/i,.5,1),r=t.fontSize*n,o=S(e.layoutRules.minimumTextSize,8,48);e.layoutRules.textScaleMode==="scale"?t.fontSize=Math.max(o,r):e.layoutRules.textScaleMode==="clamp"&&(t.fontSize=Math.max(o,Math.min(t.fontSize,r))),e.layoutRules.tightenLineHeight&&t.lineHeight!==figma.mixed&&(t.lineHeight={unit:"PERCENT",value:115})}async function te(t){t.fontName!==figma.mixed&&await figma.loadFontAsync(t.fontName)}function ee(t,e,i){return i.rowToColumnMode==="always"?Q(t,i):i.rowToColumnMode==="never"?null:(i.conversionDirection==="row-to-column"?e.screenWidth<=i.rowToColumnBreakpoint:e.screenWidth>=i.rowToColumnBreakpoint)?Q(t,i):null}function Q(t,e){return B(t)?e.conversionDirection==="row-to-column"?t.layoutMode==="HORIZONTAL"?"VERTICAL":null:t.layoutMode==="VERTICAL"?"HORIZONTAL":null:null}function ie(t){return t.layoutMode==="HORIZONTAL"||t.layoutMode==="VERTICAL"?t.layoutMode:null}function ne(t,e){return(e==null?void 0:e.enabled)===!0?{conversionDirection:e.conversionDirection,rowToColumnMode:e.rowToColumnMode,rowToColumnBreakpoint:e.rowToColumnBreakpoint,stackGap:e.stackGap,stackAlignment:e.stackAlignment}:{conversionDirection:t.layoutRules.conversionDirection,rowToColumnMode:t.layoutRules.rowToColumnMode,rowToColumnBreakpoint:t.layoutRules.rowToColumnBreakpoint,stackGap:t.layoutRules.stackGap,stackAlignment:t.layoutRules.stackAlignment}}function re(t){let e=new Map;return t==null||mt(t,"",e),e}function mt(t,e,i){i.set(e,t),t.children.forEach((n,r)=>{mt(n,e===""?String(r):`${e}/${r}`,i)})}function oe(t){return t==="center"?"CENTER":"MIN"}function ae(t,e,i,n){if(I(t))for(let r=0;r<t.children.length;r+=1){let o=t.children[r],a=n==null?void 0:n.children[r],u=N(a,o,"horizontal",e==="VERTICAL"&&i==="stretch",e),l=N(a,o,"vertical",e==="HORIZONTAL"&&i==="stretch",e),f=e==="HORIZONTAL"?u:l,m=e==="HORIZONTAL"?l:u;if("layoutAlign"in o){if(o.layoutAlign=m?"STRETCH":"INHERIT","layoutGrow"in o&&(o.layoutGrow=f?1:0),"layoutSizingHorizontal"in o){let c=u?"FILL":V(a,"horizontal");c!=null&&(o.layoutSizingHorizontal=c)}if("layoutSizingVertical"in o){let c=l?"FILL":V(a,"vertical");c!=null&&(o.layoutSizingVertical=c)}}}}function le(t,e,i,n){var l;if(!I(t))return;let r=me(t),o=Math.max(1,t.width-r.left-r.right),a=Math.max(1,t.height-r.top-r.bottom),u=S((l=t.itemSpacing)!=null?l:i.stackGap,0,200);if(e==="VERTICAL"){ue(t,n,o,a,u);return}se(t,n,i,o,a,u)}function ue(t,e,i,n,r){let o=t.children.map((m,c)=>{let g=e==null?void 0:e.children[c],p=N(g,m,"horizontal",!0,"VERTICAL"),s=N(g,m,"vertical",!1,"VERTICAL"),h=p?i:Math.min(y(m,"width",i),i);return{child:m,fillsHeight:s,nextWidth:h}}),a=r*Math.max(0,o.length-1),u=o.reduce((m,c)=>c.fillsHeight?m:m+y(c.child,"height",0),0),l=o.filter(m=>m.fillsHeight).length,f=l===0?0:Math.max(1,(n-a-u)/l);for(let m of o){let c=m.fillsHeight?f:y(m.child,"height",1);ct(m.child,m.nextWidth,c)}}function se(t,e,i,n,r,o){let a=t.children.map((c,g)=>{let p=e==null?void 0:e.children[g];return{child:c,fillsWidth:N(p,c,"horizontal",!1,"HORIZONTAL"),fillsHeight:N(p,c,"vertical",i.stackAlignment==="stretch","HORIZONTAL")}}),u=o*Math.max(0,a.length-1),l=a.reduce((c,g)=>g.fillsWidth?c:c+y(g.child,"width",0),0),f=a.filter(c=>c.fillsWidth).length,m=f===0?0:Math.max(1,(n-u-l)/f);for(let c of a){let g=y(c.child,"width",1),p=y(c.child,"height",1),s=c.fillsWidth?m:g,h=c.fillsHeight?r:p;ct(c.child,s,h)}}function me(t){return{top:S(t.paddingTop,0,1e4),right:S(t.paddingRight,0,1e4),bottom:S(t.paddingBottom,0,1e4),left:S(t.paddingLeft,0,1e4)}}function ct(t,e,i){if(!gt(t))return;let n=Math.max(1,Math.round(e*1e3)/1e3),r=Math.max(1,Math.round(i*1e3)/1e3);if(!(Math.abs(y(t,"width",n)-n)<.01&&Math.abs(y(t,"height",r)-r)<.01))try{t.resize(n,r)}catch(o){}}function N(t,e,i,n,r){let o=V(t,i);if(o!=null)return o==="FILL";if((t==null?void 0:t.layout.layoutAlign)==="STRETCH"&&W(r,i)||typeof(t==null?void 0:t.layout.layoutGrow)=="number"&&t.layout.layoutGrow>0&&P(r,i))return!0;let a=ce(e,i,r);return a!=null?a==="FILL":fe(e,i,r)||n}function V(t,e){if(t==null)return null;let i=e==="horizontal"?t.layout.layoutSizingHorizontal:t.layout.layoutSizingVertical;if(i==="FILL"||i==="HUG"||i==="FIXED")return i;let n=ft(t,e)?t.layout.primaryAxisSizingMode:t.layout.counterAxisSizingMode;return n==="AUTO"?"HUG":n==="FIXED"?"FIXED":null}function ce(t,e,i){return e==="horizontal"&&"layoutSizingHorizontal"in t?t.layoutSizingHorizontal:e==="vertical"&&"layoutSizingVertical"in t?t.layoutSizingVertical:"layoutGrow"in t&&t.layoutGrow>0&&P(i,e)?"FILL":null}function ft(t,e){return e==="horizontal"?t.layout.layoutMode==="HORIZONTAL":t.layout.layoutMode==="VERTICAL"}function P(t,e){return e==="horizontal"?t==="HORIZONTAL":t==="VERTICAL"}function W(t,e){return e==="horizontal"?t==="VERTICAL":t==="HORIZONTAL"}function fe(t,e,i){return"layoutAlign"in t&&t.layoutAlign==="STRETCH"&&W(i,e)}function ge(t){return M(t)&&t.parent===figma.currentPage}function B(t){return"layoutMode"in t}function gt(t){return"resize"in t&&typeof t.resize=="function"}function tt(t){return t==="mobile"?"Mobile":t==="tablet"?"Tablet":t==="desktop"?"Desktop":"Custom"}function he(t){let e=yt(t);return x(d({},ht({node:t,isRoot:!0,rootBounds:e,parentBounds:null,parentId:null,depth:0,siblingIndex:0,siblingCount:1})),{type:t.type,schemaVersion:1,importedAt:new Date().toISOString()})}function ht({node:t,isRoot:e=!1,rootBounds:i,parentBounds:n,parentId:r,depth:o,siblingIndex:a,siblingCount:u}){let l=yt(t),f=it(l,n!=null?n:l),m=it(l,i),c=n==null?void 0:nt(f,n),g=nt(m,i);return{id:t.id,name:t.name,type:t.type,responsive:pe(t,e),visible:et(t,"visible",!0),locked:et(t,"locked",!1),geometry:{x:y(t,"x",0),y:y(t,"y",0),width:y(t,"width",0),height:y(t,"height",0),rotation:y(t,"rotation",0),absoluteBounds:l,parentRelativeBounds:f,rootRelativeBounds:m,percentOfParent:c,percentOfRoot:g,hierarchy:{parentId:r,depth:o,siblingIndex:a,siblingCount:u}},layout:ye(t),style:de(t),text:t.type==="TEXT"?xe(t):void 0,children:I(t)?t.children.map((p,s)=>ht({node:p,rootBounds:i,parentBounds:l,parentId:t.id,depth:o+1,siblingIndex:s,siblingCount:t.children.length})):[]}}function ye(t){let e={isAutoLayout:D(t)};return"constraints"in t&&(e.constraints=z(t.constraints)),"layoutMode"in t&&(e.layoutMode=t.layoutMode,e.autoLayoutDirection=t.layoutMode),"layoutAlign"in t&&(e.layoutAlign=t.layoutAlign),"layoutGrow"in t&&(e.layoutGrow=t.layoutGrow),"layoutSizingHorizontal"in t&&(e.layoutSizingHorizontal=t.layoutSizingHorizontal),"layoutSizingVertical"in t&&(e.layoutSizingVertical=t.layoutSizingVertical),"itemSpacing"in t&&(e.itemSpacing=t.itemSpacing),"counterAxisSpacing"in t&&t.counterAxisSpacing!=null&&(e.counterAxisSpacing=t.counterAxisSpacing),"primaryAxisAlignItems"in t&&(e.primaryAxisAlignItems=t.primaryAxisAlignItems),"counterAxisAlignItems"in t&&(e.counterAxisAlignItems=t.counterAxisAlignItems),"layoutWrap"in t&&(e.layoutWrap=t.layoutWrap),"paddingTop"in t&&"paddingRight"in t&&"paddingBottom"in t&&"paddingLeft"in t&&(e.padding={top:t.paddingTop,right:t.paddingRight,bottom:t.paddingBottom,left:t.paddingLeft}),"primaryAxisSizingMode"in t&&(e.primaryAxisSizingMode=t.primaryAxisSizingMode),"counterAxisSizingMode"in t&&(e.counterAxisSizingMode=t.counterAxisSizingMode),e}function pe(t,e){let i=D(t);return{groupRole:e?"root":void 0,conversionRole:i?"auto-layout-container":"manual-layer",acceptsChildren:I(t)}}function de(t){let e={};return"opacity"in t&&(e.opacity=t.opacity),"blendMode"in t&&(e.blendMode=t.blendMode),"fills"in t&&t.fills!==figma.mixed&&(e.fills=z(t.fills)),"strokes"in t&&(e.strokes=z(t.strokes)),"strokeWeight"in t&&t.strokeWeight!==figma.mixed&&(e.strokeWeight=t.strokeWeight),"cornerRadius"in t&&(e.cornerRadius=t.cornerRadius===figma.mixed?"mixed":t.cornerRadius),"effects"in t&&(e.effects=z(t.effects)),e}function xe(t){return{characters:t.characters,fontSize:t.fontSize===figma.mixed?"mixed":t.fontSize,fontName:z(t.fontName),fontWeight:t.fontWeight===figma.mixed?void 0:t.fontWeight,textAlignHorizontal:t.textAlignHorizontal,textAlignVertical:t.textAlignVertical,lineHeight:z(t.lineHeight),letterSpacing:z(t.letterSpacing)}}function M(t){return t.type==="FRAME"||t.type==="COMPONENT"||t.type==="INSTANCE"}function D(t){return"layoutMode"in t&&t.layoutMode!=="NONE"}function I(t){return"children"in t}function y(t,e,i){let n=t[e];return typeof n=="number"?n:i}function et(t,e,i){let n=t[e];return typeof n=="boolean"?n:i}function yt(t){var a,u,l,f;let e="absoluteBoundingBox"in t?t.absoluteBoundingBox:null,i=(a=e==null?void 0:e.x)!=null?a:y(t,"x",0),n=(u=e==null?void 0:e.y)!=null?u:y(t,"y",0),r=(l=e==null?void 0:e.width)!=null?l:y(t,"width",0),o=(f=e==null?void 0:e.height)!=null?f:y(t,"height",0);return U(i,n,r,o)}function it(t,e){return U(t.x-e.x,t.y-e.y,t.width,t.height)}function nt(t,e){return{x:T(t.x,e.width),y:T(t.y,e.height),width:T(t.width,e.width),height:T(t.height,e.height),right:T(t.right,e.width),bottom:T(t.bottom,e.height)}}function U(t,e,i,n){let r=A(t),o=A(e),a=A(i),u=A(n);return{x:r,y:o,width:a,height:u,right:A(r+a),bottom:A(o+u),centerX:A(r+a/2),centerY:A(o+u/2)}}function T(t,e){return e===0?0:A(t/e*100)}function A(t){return Math.round(t*1e3)/1e3}function S(t,e,i){return Number.isFinite(t)?Math.min(i,Math.max(e,t)):e}function z(t){return t===figma.mixed?"mixed":t==null?null:typeof t=="string"||typeof t=="number"||typeof t=="boolean"?t:Array.isArray(t)?t.map(e=>z(e)):typeof t=="object"?Object.fromEntries(Object.entries(t).map(([e,i])=>[e,z(i)])):String(t)}function F(t){figma.ui.postMessage(t)}var dt=v(()=>{"use strict";j()});var Ae={"src/main.ts--default":(dt(),It(pt)).default},Se="src/main.ts--default";Ae[Se]();
+var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// node_modules/@create-figma-plugin/utilities/lib/ui.js
+function showUI(options, data) {
+  if (typeof __html__ === "undefined") {
+    throw new Error("No UI defined");
+  }
+  const html = `<div id="create-figma-plugin"></div><script>document.body.classList.add('theme-${figma.editorType}');const __FIGMA_COMMAND__='${typeof figma.command === "undefined" ? "" : figma.command}';const __SHOW_UI_DATA__=${JSON.stringify(typeof data === "undefined" ? {} : data)};${__html__}</script>`;
+  figma.showUI(html, __spreadProps(__spreadValues({}, options), {
+    themeColors: typeof options.themeColors === "undefined" ? true : options.themeColors
+  }));
+}
+var init_ui = __esm({
+  "node_modules/@create-figma-plugin/utilities/lib/ui.js"() {
+  }
+});
+
+// node_modules/@create-figma-plugin/utilities/lib/index.js
+var init_lib = __esm({
+  "node_modules/@create-figma-plugin/utilities/lib/index.js"() {
+    init_ui();
+  }
+});
+
+// src/main.ts
+var main_exports = {};
+__export(main_exports, {
+  default: () => main_default
+});
+function main_default() {
+  showUI({
+    height: 1e3,
+    width: 1400
+  });
+  figma.ui.onmessage = (message) => {
+    if (message.type === "import-selected-frame") {
+      importSelectedFrame();
+      return;
+    }
+    if (message.type === "generate-responsive-frame") {
+      generateResponsiveFrame(message.payload).catch((error) => {
+        const message2 = error instanceof Error ? error.message : "Could not generate responsive frame.";
+        figma.notify(message2);
+      });
+      return;
+    }
+    if (message.type === "create-export-frame-from-json") {
+      createExportFrameFromJson(message.payload).catch((error) => {
+        const message2 = error instanceof Error ? error.message : "Could not create export frame from JSON.";
+        figma.notify(message2);
+      });
+    }
+  };
+}
+function importSelectedFrame() {
+  const [selectedNode] = figma.currentPage.selection;
+  if (selectedNode == null) {
+    sendToUi({
+      type: "import-error",
+      message: "Select a Figma frame, component, or instance first."
+    });
+    return;
+  }
+  if (!isImportableFrameNode(selectedNode)) {
+    sendToUi({
+      type: "import-error",
+      message: "The selected layer is not a frame. Select a frame, component, or instance."
+    });
+    return;
+  }
+  if (!isAutoLayoutContainer(selectedNode)) {
+    sendToUi({
+      type: "import-error",
+      message: "Select an Auto Layout frame, component, or instance. Responsive conversion needs Figma Auto Layout data."
+    });
+    return;
+  }
+  sendToUi({
+    type: "frame-imported",
+    payload: serializeFrame(selectedNode)
+  });
+  figma.notify(`Imported "${selectedNode.name}"`);
+}
+async function generateResponsiveFrame(payload) {
+  const sourceNode = await getGenerationSourceNode(payload);
+  if (sourceNode == null) {
+    figma.notify("Import the source frame again before generating.");
+    return;
+  }
+  const sourceWidth = clampNumber(payload.sourceWidth, 1, 1e4);
+  const referenceWidth = clampNumber(payload.screenWidth, 1, 1e4);
+  const normalizedPayload = __spreadProps(__spreadValues({}, payload), {
+    sourceWidth,
+    screenWidth: referenceWidth
+  });
+  const generatedNode = sourceNode.clone();
+  generatedNode.name = `${sourceNode.name} / ${getDeviceLabel(payload.targetDevice)}`;
+  generatedNode.x = sourceNode.x + sourceNode.width + 80;
+  generatedNode.y = sourceNode.y;
+  await applyResponsiveRules(
+    generatedNode,
+    normalizedPayload,
+    sourceWidth,
+    createSourceNodeLookup(payload.sourceFrame),
+    ""
+  );
+  figma.currentPage.selection = [generatedNode];
+  figma.viewport.scrollAndZoomIntoView([generatedNode]);
+  figma.notify(`Generated ${getDeviceLabel(payload.targetDevice)} responsive frame from ${Math.round(referenceWidth)}px reference.`);
+}
+async function getGenerationSourceNode(payload) {
+  if (payload.sourceFrame != null) {
+    const importedSourceNode = await figma.getNodeByIdAsync(payload.sourceFrame.id);
+    if (importedSourceNode != null && isImportableFrameNode(importedSourceNode)) {
+      return importedSourceNode;
+    }
+  }
+  const [selectedNode] = figma.currentPage.selection;
+  return selectedNode != null && isImportableFrameNode(selectedNode) ? selectedNode : null;
+}
+async function createExportFrameFromJson(payload) {
+  const materializedFrame = materializeExportPreviewFrame(payload);
+  const exportFrame = await createSceneNodeFromSerializedNode(materializedFrame, true);
+  if (!isImportableFrameNode(exportFrame)) {
+    figma.notify("JSON export must resolve to a frame.");
+    return;
+  }
+  exportFrame.name = materializedFrame.name;
+  exportFrame.x = getNextExportFrameX(materializedFrame.geometry.width);
+  exportFrame.y = figma.viewport.center.y - materializedFrame.geometry.height / 2;
+  figma.currentPage.appendChild(exportFrame);
+  figma.currentPage.selection = [exportFrame];
+  figma.viewport.scrollAndZoomIntoView([exportFrame]);
+  figma.notify(`Created export frame "${exportFrame.name}" from JSON.`);
+}
+function materializeExportPreviewFrame(payload) {
+  const reviewWidth = Number.isFinite(payload.screenWidth) && payload.screenWidth > 0 ? payload.screenWidth : payload.frame.geometry.width;
+  const exportGroups = createJsonExportReviewGroups(payload.frame, reviewWidth, payload.layoutRules);
+  const reviewHeight = Math.max(
+    Math.min(payload.frame.geometry.height, 760),
+    exportGroups.reduce((bottom, group) => Math.max(bottom, group.y + group.height), 0) + 24
+  );
+  return __spreadProps(__spreadValues({}, withSerializedGeometry(
+    __spreadProps(__spreadValues({}, payload.frame), {
+      layout: getStaticSerializedLayout(payload.frame),
+      children: exportGroups.map((group) => materializeJsonExportNode({
+        node: group.node,
+        origin: group.sourceBounds,
+        scale: group.scale,
+        layoutRules: payload.layoutRules,
+        reviewWidth,
+        x: group.x,
+        y: group.y,
+        width: group.width,
+        height: group.height
+      }))
+    }),
+    0,
+    0,
+    reviewWidth,
+    reviewHeight
+  )), {
+    type: payload.frame.type,
+    schemaVersion: 1,
+    importedAt: payload.frame.importedAt
+  });
+}
+function createJsonExportReviewGroups(frame, reviewWidth, layoutRules) {
+  const outerPadding = layoutRules.outputPadding;
+  const contentWidth = Math.max(1, reviewWidth - outerPadding * 2);
+  const visibleChildren = frame.children.filter((child) => child.visible).sort((first, second) => first.geometry.y - second.geometry.y || first.geometry.x - second.geometry.x);
+  let nextY = outerPadding;
+  return visibleChildren.map((child) => {
+    const sourceBounds = child.geometry;
+    const scale = contentWidth / Math.max(sourceBounds.width, 1);
+    const height = Math.max(1, getJsonExportNodeHeight(child, layoutRules, reviewWidth) * scale);
+    const group = {
+      node: child,
+      x: outerPadding,
+      y: nextY,
+      width: contentWidth,
+      height,
+      sourceBounds,
+      scale
+    };
+    nextY += height + layoutRules.stackGap;
+    return group;
+  });
+}
+function materializeJsonExportNode({
+  node,
+  origin,
+  scale,
+  layoutRules,
+  reviewWidth,
+  x = (node.geometry.x - origin.x) * scale,
+  y = (node.geometry.y - origin.y) * scale,
+  width = node.geometry.width * scale,
+  height = getJsonExportNodeHeight(node, layoutRules, reviewWidth) * scale
+}) {
+  const arrangedChildren = arrangeJsonExportChildren(node, layoutRules, reviewWidth);
+  const text = node.text == null ? void 0 : __spreadProps(__spreadValues({}, node.text), {
+    fontSize: typeof node.text.fontSize === "number" ? getJsonExportFontSize(node.text.fontSize, scale, layoutRules) : node.text.fontSize,
+    lineHeight: scaleJsonExportLineHeight(node.text.lineHeight, scale)
+  });
+  const style = __spreadProps(__spreadValues({}, node.style), {
+    strokeWeight: typeof node.style.strokeWeight === "number" ? node.style.strokeWeight * scale : node.style.strokeWeight,
+    cornerRadius: typeof node.style.cornerRadius === "number" ? node.style.cornerRadius * scale : node.style.cornerRadius
+  });
+  return withSerializedGeometry(
+    __spreadProps(__spreadValues({}, node), {
+      layout: getStaticSerializedLayout(node),
+      style,
+      text,
+      children: arrangedChildren.filter((child) => child.node.visible).map((child) => materializeJsonExportNode({
+        node: child.node,
+        origin: { x: 0, y: 0 },
+        scale,
+        layoutRules,
+        reviewWidth
+      }))
+    }),
+    x,
+    y,
+    width,
+    height
+  );
+}
+function getJsonExportNodeHeight(node, layoutRules, reviewWidth) {
+  var _a;
+  if (node.children.length === 0) {
+    return node.geometry.height;
+  }
+  const arrangedChildren = arrangeJsonExportChildren(node, layoutRules, reviewWidth);
+  const childrenBottom = arrangedChildren.reduce((bottom, child) => {
+    return Math.max(
+      bottom,
+      child.node.geometry.y + getJsonExportNodeHeight(child.node, layoutRules, reviewWidth)
+    );
+  }, 0);
+  const padding = (_a = node.layout.padding) != null ? _a : {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+  if (getJsonExportNodeAxisSizing(node, "vertical") === "HUG") {
+    return Math.max(1, childrenBottom + padding.bottom);
+  }
+  return Math.max(node.geometry.height, childrenBottom);
+}
+function arrangeJsonExportChildren(node, layoutRules, reviewWidth) {
+  const effectiveRules = getEffectiveJsonExportRules(node, layoutRules);
+  const convertedLayoutMode = getConvertedJsonExportLayoutMode(node, effectiveRules, reviewWidth);
+  const activeLayoutMode = convertedLayoutMode != null ? convertedLayoutMode : getNativeJsonExportLayoutMode(node);
+  const activeRules = convertedLayoutMode == null ? getNativeJsonExportLayoutRules(node, effectiveRules) : effectiveRules;
+  if (activeLayoutMode == null) {
+    return node.children.map((child) => ({ node: child }));
+  }
+  if (activeLayoutMode === "HORIZONTAL") {
+    return arrangeJsonExportChildrenHorizontally(node, layoutRules, activeRules, reviewWidth);
+  }
+  return arrangeJsonExportChildrenVertically(node, layoutRules, activeRules, reviewWidth);
+}
+function arrangeJsonExportChildrenVertically(node, layoutRules, effectiveRules, reviewWidth) {
+  var _a;
+  const padding = (_a = node.layout.padding) != null ? _a : {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+  let nextY = padding.top;
+  const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right);
+  const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom);
+  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1);
+  const childLayouts = node.children.map((child) => {
+    const childWidth = shouldFillJsonExportAxis(
+      child,
+      "horizontal",
+      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      "VERTICAL"
+    ) ? contentWidth : Math.min(child.geometry.width, contentWidth);
+    const childForWidth = withSerializedGeometry(
+      child,
+      child.geometry.x,
+      child.geometry.y,
+      childWidth,
+      child.geometry.height
+    );
+    return {
+      child,
+      childWidth,
+      baseHeight: getJsonExportNodeHeight(childForWidth, layoutRules, reviewWidth),
+      fillsHeight: shouldFillJsonExportAxis(child, "vertical", false, "VERTICAL")
+    };
+  });
+  const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length;
+  const fixedHeightTotal = childLayouts.reduce((total, child) => {
+    return child.fillsHeight ? total : total + child.baseHeight;
+  }, 0);
+  const fillHeight = fillHeightCount === 0 ? 0 : Math.max(1, (contentHeight - totalGap - fixedHeightTotal) / fillHeightCount);
+  return childLayouts.map((childLayout) => {
+    const child = childLayout.child;
+    const childWidth = childLayout.childWidth;
+    const childHeight = childLayout.fillsHeight ? fillHeight : childLayout.baseHeight;
+    const childX = getJsonExportStackedChildX(
+      effectiveRules.stackAlignment,
+      padding.left,
+      contentWidth,
+      childWidth
+    );
+    const nextChild = withSerializedGeometry(
+      child,
+      childX,
+      nextY,
+      childWidth,
+      childHeight
+    );
+    nextY += childHeight + effectiveRules.stackGap;
+    return {
+      node: nextChild
+    };
+  });
+}
+function arrangeJsonExportChildrenHorizontally(node, _layoutRules, effectiveRules, _reviewWidth) {
+  var _a;
+  const padding = (_a = node.layout.padding) != null ? _a : {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+  let nextX = padding.left;
+  const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right);
+  const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom);
+  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1);
+  const childLayouts = node.children.map((child) => ({
+    child,
+    fillsWidth: shouldFillJsonExportAxis(child, "horizontal", false, "HORIZONTAL"),
+    childHeight: shouldFillJsonExportAxis(
+      child,
+      "vertical",
+      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      "HORIZONTAL"
+    ) ? contentHeight : child.geometry.height
+  }));
+  const fillWidthCount = childLayouts.filter((child) => child.fillsWidth).length;
+  const fixedWidthTotal = childLayouts.reduce((total, child) => {
+    return child.fillsWidth ? total : total + child.child.geometry.width;
+  }, 0);
+  const fillChildWidth = fillWidthCount === 0 ? 0 : Math.max(1, (contentWidth - totalGap - fixedWidthTotal) / fillWidthCount);
+  return childLayouts.map((childLayout) => {
+    const child = childLayout.child;
+    const childWidth = childLayout.fillsWidth ? fillChildWidth : child.geometry.width;
+    const childHeight = childLayout.childHeight;
+    const childY = getJsonExportInlineChildY(
+      effectiveRules.stackAlignment,
+      padding.top,
+      contentHeight,
+      childHeight
+    );
+    const nextChild = withSerializedGeometry(
+      child,
+      nextX,
+      childY,
+      childWidth,
+      childHeight
+    );
+    nextX += childWidth + effectiveRules.stackGap;
+    return {
+      node: nextChild
+    };
+  });
+}
+function getConvertedJsonExportLayoutMode(node, layoutRules, reviewWidth) {
+  if (layoutRules.rowToColumnMode === "always") {
+    return getTargetJsonExportLayoutMode(node, layoutRules);
+  }
+  if (layoutRules.rowToColumnMode === "never") {
+    return null;
+  }
+  const shouldConvert = layoutRules.conversionDirection === "row-to-column" ? reviewWidth <= layoutRules.rowToColumnBreakpoint : reviewWidth >= layoutRules.rowToColumnBreakpoint;
+  return shouldConvert ? getTargetJsonExportLayoutMode(node, layoutRules) : null;
+}
+function getTargetJsonExportLayoutMode(node, layoutRules) {
+  if (layoutRules.conversionDirection === "row-to-column") {
+    return node.layout.layoutMode === "HORIZONTAL" ? "VERTICAL" : null;
+  }
+  return node.layout.layoutMode === "VERTICAL" ? "HORIZONTAL" : null;
+}
+function getNativeJsonExportLayoutMode(node) {
+  if (node.layout.layoutMode === "HORIZONTAL" || node.layout.layoutMode === "VERTICAL") {
+    return node.layout.layoutMode;
+  }
+  return null;
+}
+function getNativeJsonExportLayoutRules(node, fallbackRules) {
+  var _a;
+  return __spreadProps(__spreadValues({}, fallbackRules), {
+    stackGap: (_a = node.layout.itemSpacing) != null ? _a : fallbackRules.stackGap,
+    stackAlignment: getNativeJsonExportStackAlignment(node)
+  });
+}
+function getNativeJsonExportStackAlignment(node) {
+  if (node.layout.counterAxisAlignItems === "CENTER" || node.layout.counterAxisAlignItems === "BASELINE") {
+    return "center";
+  }
+  return "start";
+}
+function getEffectiveJsonExportRules(node, layoutRules) {
+  var _a;
+  const nodeRule = (_a = node.responsive) == null ? void 0 : _a.nodeRule;
+  if ((nodeRule == null ? void 0 : nodeRule.enabled) === true) {
+    return {
+      conversionDirection: nodeRule.conversionDirection,
+      rowToColumnMode: nodeRule.rowToColumnMode,
+      rowToColumnBreakpoint: nodeRule.rowToColumnBreakpoint,
+      stackGap: nodeRule.stackGap,
+      stackAlignment: nodeRule.stackAlignment
+    };
+  }
+  return {
+    conversionDirection: layoutRules.conversionDirection,
+    rowToColumnMode: layoutRules.rowToColumnMode,
+    rowToColumnBreakpoint: layoutRules.rowToColumnBreakpoint,
+    stackGap: layoutRules.stackGap,
+    stackAlignment: layoutRules.stackAlignment
+  };
+}
+function shouldFillJsonExportAxis(node, axis, defaultFill, parentLayoutMode = null) {
+  const sizingMode = getJsonExportNodeAxisSizing(node, axis, parentLayoutMode);
+  return sizingMode === "FILL" || sizingMode == null && defaultFill;
+}
+function getJsonExportNodeAxisSizing(node, axis, parentLayoutMode = null) {
+  const layoutSizing = axis === "horizontal" ? node.layout.layoutSizingHorizontal : node.layout.layoutSizingVertical;
+  if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
+    return layoutSizing;
+  }
+  const axisSizing = axisMatchesPrimaryAxis(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
+  if (axisSizing === "AUTO") {
+    return "HUG";
+  }
+  if (axisSizing === "FIXED") {
+    return "FIXED";
+  }
+  if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return "FILL";
+  }
+  if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
+    return "FILL";
+  }
+  return null;
+}
+function getJsonExportFontSize(fontSize, scale, layoutRules) {
+  const scaledSize = fontSize * scale;
+  if (layoutRules.textScaleMode === "preserve") {
+    return Math.max(8, scaledSize);
+  }
+  if (layoutRules.textScaleMode === "scale") {
+    return Math.max(layoutRules.minimumTextSize, scaledSize);
+  }
+  return Math.max(layoutRules.minimumTextSize, Math.min(fontSize, scaledSize));
+}
+function scaleJsonExportLineHeight(lineHeight, scale) {
+  const lineHeightObject = asJsonObject(lineHeight);
+  if (lineHeightObject != null && lineHeightObject.unit === "PIXELS" && typeof lineHeightObject.value === "number") {
+    return __spreadProps(__spreadValues({}, lineHeightObject), {
+      value: lineHeightObject.value * scale
+    });
+  }
+  return lineHeight;
+}
+function getJsonExportStackedChildX(stackAlignment, paddingLeft, contentWidth, childWidth) {
+  if (stackAlignment === "center") {
+    return paddingLeft + Math.max(0, (contentWidth - childWidth) / 2);
+  }
+  return paddingLeft;
+}
+function getJsonExportInlineChildY(stackAlignment, paddingTop, contentHeight, childHeight) {
+  if (stackAlignment === "center") {
+    return paddingTop + Math.max(0, (contentHeight - childHeight) / 2);
+  }
+  return paddingTop;
+}
+function getStaticSerializedLayout(node) {
+  return __spreadProps(__spreadValues({}, node.layout), {
+    isAutoLayout: false,
+    autoLayoutDirection: "NONE",
+    layoutMode: "NONE",
+    layoutAlign: "INHERIT",
+    layoutGrow: 0,
+    layoutSizingHorizontal: "FIXED",
+    layoutSizingVertical: "FIXED"
+  });
+}
+function withSerializedGeometry(node, x, y, width, height) {
+  const safeX = roundLayoutNumber(x);
+  const safeY = roundLayoutNumber(y);
+  const safeWidth = Math.max(1, roundLayoutNumber(width));
+  const safeHeight = Math.max(1, roundLayoutNumber(height));
+  const bounds = createBounds(safeX, safeY, safeWidth, safeHeight);
+  return __spreadProps(__spreadValues({}, node), {
+    geometry: __spreadProps(__spreadValues({}, node.geometry), {
+      x: safeX,
+      y: safeY,
+      width: safeWidth,
+      height: safeHeight,
+      absoluteBounds: bounds,
+      parentRelativeBounds: bounds,
+      rootRelativeBounds: bounds
+    })
+  });
+}
+async function createSceneNodeFromSerializedNode(node, isRoot = false) {
+  const sceneNode = await createBaseSceneNode(node);
+  applySerializedNodeProperties(sceneNode, node, isRoot);
+  if (hasChildren(sceneNode)) {
+    for (const child of node.children) {
+      const childNode = await createSceneNodeFromSerializedNode(child);
+      sceneNode.appendChild(childNode);
+    }
+  }
+  return sceneNode;
+}
+async function createBaseSceneNode(node) {
+  var _a;
+  if (node.type === "TEXT") {
+    const textNode = figma.createText();
+    await applySerializedText(textNode, node);
+    return textNode;
+  }
+  if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE" || node.type === "RESPONSIVE_GROUP" || ((_a = node.responsive) == null ? void 0 : _a.isVirtualGroup) === true || node.children.length > 0) {
+    return figma.createFrame();
+  }
+  if (node.type === "RECTANGLE") {
+    return figma.createRectangle();
+  }
+  return figma.createRectangle();
+}
+function applySerializedNodeProperties(sceneNode, node, isRoot = false) {
+  sceneNode.name = node.name;
+  sceneNode.visible = node.visible;
+  sceneNode.locked = node.locked;
+  sceneNode.x = node.geometry.x;
+  sceneNode.y = node.geometry.y;
+  if ("rotation" in sceneNode) {
+    sceneNode.rotation = node.geometry.rotation;
+  }
+  if (canResize(sceneNode)) {
+    sceneNode.resize(
+      Math.max(1, node.geometry.width),
+      Math.max(1, node.geometry.height)
+    );
+  }
+  if ("opacity" in sceneNode && typeof node.style.opacity === "number") {
+    sceneNode.opacity = clampNumber(node.style.opacity, 0, 1);
+  }
+  if ("fills" in sceneNode) {
+    const fills = toFigmaReadonlyArray(node.style.fills);
+    if (fills != null) {
+      sceneNode.fills = fills;
+    } else if (!isRoot) {
+      sceneNode.fills = [];
+    }
+  }
+  if ("strokes" in sceneNode) {
+    const strokes = toFigmaReadonlyArray(node.style.strokes);
+    if (strokes != null) {
+      sceneNode.strokes = strokes;
+    }
+  }
+  if ("strokeWeight" in sceneNode && typeof node.style.strokeWeight === "number") {
+    sceneNode.strokeWeight = node.style.strokeWeight;
+  }
+  if ("cornerRadius" in sceneNode && typeof node.style.cornerRadius === "number") {
+    ;
+    sceneNode.cornerRadius = node.style.cornerRadius;
+  }
+  if ("effects" in sceneNode) {
+    const effects = toFigmaReadonlyArray(node.style.effects);
+    if (effects != null) {
+      sceneNode.effects = effects;
+    }
+  }
+  applySerializedLayout(sceneNode, node);
+}
+async function applySerializedText(textNode, node) {
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  const fontName = (_b = toFigmaFontName((_a = node.text) == null ? void 0 : _a.fontName)) != null ? _b : { family: "Inter", style: "Regular" };
+  await figma.loadFontAsync(fontName);
+  textNode.fontName = fontName;
+  textNode.characters = (_d = (_c = node.text) == null ? void 0 : _c.characters) != null ? _d : "";
+  if (typeof ((_e = node.text) == null ? void 0 : _e.fontSize) === "number") {
+    textNode.fontSize = node.text.fontSize;
+  }
+  if (((_f = node.text) == null ? void 0 : _f.textAlignHorizontal) === "LEFT" || ((_g = node.text) == null ? void 0 : _g.textAlignHorizontal) === "CENTER" || ((_h = node.text) == null ? void 0 : _h.textAlignHorizontal) === "RIGHT" || ((_i = node.text) == null ? void 0 : _i.textAlignHorizontal) === "JUSTIFIED") {
+    textNode.textAlignHorizontal = node.text.textAlignHorizontal;
+  }
+  if (((_j = node.text) == null ? void 0 : _j.textAlignVertical) === "TOP" || ((_k = node.text) == null ? void 0 : _k.textAlignVertical) === "CENTER" || ((_l = node.text) == null ? void 0 : _l.textAlignVertical) === "BOTTOM") {
+    textNode.textAlignVertical = node.text.textAlignVertical;
+  }
+  const lineHeight = toFigmaLineHeight((_m = node.text) == null ? void 0 : _m.lineHeight);
+  if (lineHeight != null) {
+    textNode.lineHeight = lineHeight;
+  }
+}
+function applySerializedLayout(sceneNode, node) {
+  var _a;
+  if (hasAutoLayout(sceneNode)) {
+    const layoutMode = node.layout.layoutMode === "HORIZONTAL" || node.layout.layoutMode === "VERTICAL" ? node.layout.layoutMode : "NONE";
+    sceneNode.layoutMode = layoutMode;
+    if (layoutMode !== "NONE") {
+      sceneNode.itemSpacing = clampNumber((_a = node.layout.itemSpacing) != null ? _a : 0, 0, 1e3);
+      sceneNode.primaryAxisAlignItems = toFigmaAxisAlign(node.layout.primaryAxisAlignItems);
+      sceneNode.counterAxisAlignItems = toFigmaCounterAxisAlign(node.layout.counterAxisAlignItems);
+      sceneNode.primaryAxisSizingMode = toFigmaAxisSizing(node.layout.primaryAxisSizingMode);
+      sceneNode.counterAxisSizingMode = toFigmaAxisSizing(node.layout.counterAxisSizingMode);
+      const padding = node.layout.padding;
+      if (padding != null) {
+        sceneNode.paddingTop = padding.top;
+        sceneNode.paddingRight = padding.right;
+        sceneNode.paddingBottom = padding.bottom;
+        sceneNode.paddingLeft = padding.left;
+      }
+    }
+  }
+  if ("layoutAlign" in sceneNode && (node.layout.layoutAlign === "INHERIT" || node.layout.layoutAlign === "STRETCH")) {
+    sceneNode.layoutAlign = node.layout.layoutAlign;
+  }
+  if ("layoutGrow" in sceneNode && typeof node.layout.layoutGrow === "number") {
+    sceneNode.layoutGrow = node.layout.layoutGrow;
+  }
+  if ("layoutSizingHorizontal" in sceneNode && isFigmaLayoutSizingMode(node.layout.layoutSizingHorizontal)) {
+    sceneNode.layoutSizingHorizontal = node.layout.layoutSizingHorizontal;
+  }
+  if ("layoutSizingVertical" in sceneNode && isFigmaLayoutSizingMode(node.layout.layoutSizingVertical)) {
+    sceneNode.layoutSizingVertical = node.layout.layoutSizingVertical;
+  }
+}
+function getNextExportFrameX(width) {
+  const selectedNodes = figma.currentPage.selection;
+  if (selectedNodes.length > 0) {
+    return Math.max(...selectedNodes.map((node) => readNumber(node, "x", 0) + readNumber(node, "width", 0))) + 80;
+  }
+  return figma.viewport.center.x - width / 2;
+}
+function toFigmaReadonlyArray(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  return value;
+}
+function toFigmaFontName(value) {
+  const fontName = asJsonObject(value);
+  if (fontName == null || typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+    return null;
+  }
+  return {
+    family: fontName.family,
+    style: fontName.style
+  };
+}
+function toFigmaLineHeight(value) {
+  const lineHeight = asJsonObject(value);
+  if (lineHeight == null || typeof lineHeight.unit !== "string") {
+    return null;
+  }
+  if (lineHeight.unit === "PIXELS" && typeof lineHeight.value === "number") {
+    return {
+      unit: "PIXELS",
+      value: lineHeight.value
+    };
+  }
+  if (lineHeight.unit === "PERCENT" && typeof lineHeight.value === "number") {
+    return {
+      unit: "PERCENT",
+      value: lineHeight.value
+    };
+  }
+  if (lineHeight.unit === "AUTO") {
+    return {
+      unit: "AUTO"
+    };
+  }
+  return null;
+}
+function toFigmaAxisAlign(value) {
+  if (value === "CENTER" || value === "MAX" || value === "SPACE_BETWEEN") {
+    return value;
+  }
+  return "MIN";
+}
+function toFigmaCounterAxisAlign(value) {
+  if (value === "CENTER" || value === "MAX" || value === "BASELINE") {
+    return value;
+  }
+  return "MIN";
+}
+function toFigmaAxisSizing(value) {
+  return value === "AUTO" ? "AUTO" : "FIXED";
+}
+function isFigmaLayoutSizingMode(value) {
+  return value === "FIXED" || value === "HUG" || value === "FILL";
+}
+function asJsonObject(value) {
+  return value != null && !Array.isArray(value) && typeof value === "object" ? value : null;
+}
+async function applyResponsiveRules(node, payload, sourceWidth, sourceNodeLookup, nodePath) {
+  var _a;
+  const sourceNode = sourceNodeLookup.get(nodePath);
+  const effectiveRules = getEffectiveGenerationRules(payload, (_a = sourceNode == null ? void 0 : sourceNode.responsive) == null ? void 0 : _a.nodeRule);
+  if (hasAutoLayout(node)) {
+    const nextLayoutMode = getConvertedLayoutMode(node, payload, effectiveRules);
+    if (nextLayoutMode != null) {
+      node.layoutMode = nextLayoutMode;
+      node.itemSpacing = clampNumber(effectiveRules.stackGap, 0, 200);
+      node.counterAxisAlignItems = getFigmaCounterAxisAlignment(effectiveRules.stackAlignment);
+    }
+    const activeLayoutMode = nextLayoutMode != null ? nextLayoutMode : getCurrentLayoutMode(node);
+    if (activeLayoutMode != null) {
+      applyConvertedChildSizing(node, activeLayoutMode, effectiveRules.stackAlignment, sourceNode);
+      applyResponsiveChildGeometry(node, activeLayoutMode, effectiveRules, sourceNode);
+    }
+    if (isRootResponsiveNode(node)) {
+      const padding = clampNumber(payload.layoutRules.outputPadding, 0, 200);
+      node.paddingTop = padding;
+      node.paddingRight = padding;
+      node.paddingBottom = padding;
+      node.paddingLeft = padding;
+    }
+  }
+  if (node.type === "TEXT") {
+    await applyResponsiveTextRules(node, payload, sourceWidth);
+  }
+  if (hasChildren(node)) {
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      await applyResponsiveRules(
+        child,
+        payload,
+        sourceWidth,
+        sourceNodeLookup,
+        nodePath === "" ? String(index) : `${nodePath}/${index}`
+      );
+    }
+  }
+}
+async function applyResponsiveTextRules(node, payload, sourceWidth) {
+  if (typeof node.fontSize !== "number") {
+    return;
+  }
+  await loadTextFonts(node);
+  const widthScale = clampNumber(payload.screenWidth / sourceWidth, 0.5, 1);
+  const scaledSize = node.fontSize * widthScale;
+  const minimumTextSize = clampNumber(payload.layoutRules.minimumTextSize, 8, 48);
+  if (payload.layoutRules.textScaleMode === "scale") {
+    node.fontSize = Math.max(minimumTextSize, scaledSize);
+  } else if (payload.layoutRules.textScaleMode === "clamp") {
+    node.fontSize = Math.max(minimumTextSize, Math.min(node.fontSize, scaledSize));
+  }
+  if (payload.layoutRules.tightenLineHeight && node.lineHeight !== figma.mixed) {
+    node.lineHeight = {
+      unit: "PERCENT",
+      value: 115
+    };
+  }
+}
+async function loadTextFonts(node) {
+  if (node.fontName !== figma.mixed) {
+    await figma.loadFontAsync(node.fontName);
+  }
+}
+function getConvertedLayoutMode(node, payload, layoutRules) {
+  if (layoutRules.rowToColumnMode === "always") {
+    return getTargetLayoutMode(node, layoutRules);
+  }
+  if (layoutRules.rowToColumnMode === "never") {
+    return null;
+  }
+  const shouldConvert = layoutRules.conversionDirection === "row-to-column" ? payload.screenWidth <= layoutRules.rowToColumnBreakpoint : payload.screenWidth >= layoutRules.rowToColumnBreakpoint;
+  return shouldConvert ? getTargetLayoutMode(node, layoutRules) : null;
+}
+function getTargetLayoutMode(node, layoutRules) {
+  if (!hasAutoLayout(node)) {
+    return null;
+  }
+  if (layoutRules.conversionDirection === "row-to-column") {
+    return node.layoutMode === "HORIZONTAL" ? "VERTICAL" : null;
+  }
+  return node.layoutMode === "VERTICAL" ? "HORIZONTAL" : null;
+}
+function getCurrentLayoutMode(node) {
+  if (node.layoutMode === "HORIZONTAL" || node.layoutMode === "VERTICAL") {
+    return node.layoutMode;
+  }
+  return null;
+}
+function getEffectiveGenerationRules(payload, nodeRule) {
+  if ((nodeRule == null ? void 0 : nodeRule.enabled) === true) {
+    return {
+      conversionDirection: nodeRule.conversionDirection,
+      rowToColumnMode: nodeRule.rowToColumnMode,
+      rowToColumnBreakpoint: nodeRule.rowToColumnBreakpoint,
+      stackGap: nodeRule.stackGap,
+      stackAlignment: nodeRule.stackAlignment
+    };
+  }
+  return {
+    conversionDirection: payload.layoutRules.conversionDirection,
+    rowToColumnMode: payload.layoutRules.rowToColumnMode,
+    rowToColumnBreakpoint: payload.layoutRules.rowToColumnBreakpoint,
+    stackGap: payload.layoutRules.stackGap,
+    stackAlignment: payload.layoutRules.stackAlignment
+  };
+}
+function createSourceNodeLookup(sourceFrame) {
+  const sourceNodeLookup = /* @__PURE__ */ new Map();
+  if (sourceFrame == null) {
+    return sourceNodeLookup;
+  }
+  collectSourceNodes(sourceFrame, "", sourceNodeLookup);
+  return sourceNodeLookup;
+}
+function collectSourceNodes(node, nodePath, sourceNodeLookup) {
+  sourceNodeLookup.set(nodePath, node);
+  node.children.forEach((child, index) => {
+    collectSourceNodes(
+      child,
+      nodePath === "" ? String(index) : `${nodePath}/${index}`,
+      sourceNodeLookup
+    );
+  });
+}
+function getFigmaCounterAxisAlignment(alignment) {
+  if (alignment === "center") {
+    return "CENTER";
+  }
+  return "MIN";
+}
+function applyConvertedChildSizing(node, layoutMode, alignment, sourceNode) {
+  if (!hasChildren(node)) {
+    return;
+  }
+  for (let index = 0; index < node.children.length; index += 1) {
+    const child = node.children[index];
+    const sourceChild = sourceNode == null ? void 0 : sourceNode.children[index];
+    const fillsHorizontal = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "horizontal",
+      layoutMode === "VERTICAL" && alignment === "stretch",
+      layoutMode
+    );
+    const fillsVertical = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "vertical",
+      layoutMode === "HORIZONTAL" && alignment === "stretch",
+      layoutMode
+    );
+    const fillsMainAxis = layoutMode === "HORIZONTAL" ? fillsHorizontal : fillsVertical;
+    const fillsCrossAxis = layoutMode === "HORIZONTAL" ? fillsVertical : fillsHorizontal;
+    if (!("layoutAlign" in child)) {
+      continue;
+    }
+    child.layoutAlign = fillsCrossAxis ? "STRETCH" : "INHERIT";
+    if ("layoutGrow" in child) {
+      child.layoutGrow = fillsMainAxis ? 1 : 0;
+    }
+    if ("layoutSizingHorizontal" in child) {
+      const sizing = fillsHorizontal ? "FILL" : getSerializedAxisSizing(sourceChild, "horizontal");
+      if (sizing != null) {
+        child.layoutSizingHorizontal = sizing;
+      }
+    }
+    if ("layoutSizingVertical" in child) {
+      const sizing = fillsVertical ? "FILL" : getSerializedAxisSizing(sourceChild, "vertical");
+      if (sizing != null) {
+        child.layoutSizingVertical = sizing;
+      }
+    }
+  }
+}
+function applyResponsiveChildGeometry(node, layoutMode, layoutRules, sourceNode) {
+  var _a;
+  if (!hasChildren(node)) {
+    return;
+  }
+  const padding = getNodePadding(node);
+  const contentWidth = Math.max(1, node.width - padding.left - padding.right);
+  const contentHeight = Math.max(1, node.height - padding.top - padding.bottom);
+  const gap = clampNumber((_a = node.itemSpacing) != null ? _a : layoutRules.stackGap, 0, 200);
+  if (layoutMode === "VERTICAL") {
+    resizeVerticalLayoutChildren(node, sourceNode, contentWidth, contentHeight, gap);
+    return;
+  }
+  resizeHorizontalLayoutChildren(node, sourceNode, layoutRules, contentWidth, contentHeight, gap);
+}
+function resizeVerticalLayoutChildren(node, sourceNode, contentWidth, contentHeight, gap) {
+  const metrics = node.children.map((child, index) => {
+    const sourceChild = sourceNode == null ? void 0 : sourceNode.children[index];
+    const fillsWidth = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "horizontal",
+      true,
+      "VERTICAL"
+    );
+    const fillsHeight = shouldFillGeneratedAxis(
+      sourceChild,
+      child,
+      "vertical",
+      false,
+      "VERTICAL"
+    );
+    const nextWidth = fillsWidth ? contentWidth : Math.min(readNumber(child, "width", contentWidth), contentWidth);
+    return {
+      child,
+      fillsHeight,
+      nextWidth
+    };
+  });
+  const totalGap = gap * Math.max(0, metrics.length - 1);
+  const fixedHeightTotal = metrics.reduce((total, metric) => {
+    return metric.fillsHeight ? total : total + readNumber(metric.child, "height", 0);
+  }, 0);
+  const fillHeightCount = metrics.filter((metric) => metric.fillsHeight).length;
+  const fillHeight = fillHeightCount === 0 ? 0 : Math.max(1, (contentHeight - totalGap - fixedHeightTotal) / fillHeightCount);
+  for (const metric of metrics) {
+    const nextHeight = metric.fillsHeight ? fillHeight : readNumber(metric.child, "height", 1);
+    resizeSceneNode(metric.child, metric.nextWidth, nextHeight);
+  }
+}
+function resizeHorizontalLayoutChildren(node, sourceNode, layoutRules, contentWidth, contentHeight, gap) {
+  const metrics = node.children.map((child, index) => {
+    const sourceChild = sourceNode == null ? void 0 : sourceNode.children[index];
+    return {
+      child,
+      fillsWidth: shouldFillGeneratedAxis(
+        sourceChild,
+        child,
+        "horizontal",
+        false,
+        "HORIZONTAL"
+      ),
+      fillsHeight: shouldFillGeneratedAxis(
+        sourceChild,
+        child,
+        "vertical",
+        layoutRules.stackAlignment === "stretch",
+        "HORIZONTAL"
+      )
+    };
+  });
+  const totalGap = gap * Math.max(0, metrics.length - 1);
+  const fixedWidthTotal = metrics.reduce((total, metric) => {
+    return metric.fillsWidth ? total : total + readNumber(metric.child, "width", 0);
+  }, 0);
+  const fillWidthCount = metrics.filter((metric) => metric.fillsWidth).length;
+  const fillWidth = fillWidthCount === 0 ? 0 : Math.max(1, (contentWidth - totalGap - fixedWidthTotal) / fillWidthCount);
+  for (const metric of metrics) {
+    const currentWidth = readNumber(metric.child, "width", 1);
+    const currentHeight = readNumber(metric.child, "height", 1);
+    const nextWidth = metric.fillsWidth ? fillWidth : currentWidth;
+    const nextHeight = metric.fillsHeight ? contentHeight : currentHeight;
+    resizeSceneNode(metric.child, nextWidth, nextHeight);
+  }
+}
+function getNodePadding(node) {
+  return {
+    top: clampNumber(node.paddingTop, 0, 1e4),
+    right: clampNumber(node.paddingRight, 0, 1e4),
+    bottom: clampNumber(node.paddingBottom, 0, 1e4),
+    left: clampNumber(node.paddingLeft, 0, 1e4)
+  };
+}
+function resizeSceneNode(node, width, height) {
+  if (!canResize(node)) {
+    return;
+  }
+  const nextWidth = Math.max(1, Math.round(width * 1e3) / 1e3);
+  const nextHeight = Math.max(1, Math.round(height * 1e3) / 1e3);
+  if (Math.abs(readNumber(node, "width", nextWidth) - nextWidth) < 0.01 && Math.abs(readNumber(node, "height", nextHeight) - nextHeight) < 0.01) {
+    return;
+  }
+  try {
+    node.resize(nextWidth, nextHeight);
+  } catch (_error) {
+  }
+}
+function shouldFillGeneratedAxis(sourceNode, fallbackNode, axis, defaultFill, parentLayoutMode) {
+  const serializedSizing = getSerializedAxisSizing(sourceNode, axis);
+  if (serializedSizing != null) {
+    return serializedSizing === "FILL";
+  }
+  if ((sourceNode == null ? void 0 : sourceNode.layout.layoutAlign) === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return true;
+  }
+  if (typeof (sourceNode == null ? void 0 : sourceNode.layout.layoutGrow) === "number" && sourceNode.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
+    return true;
+  }
+  const sceneSizing = getSceneAxisSizing(fallbackNode, axis, parentLayoutMode);
+  if (sceneSizing != null) {
+    return sceneSizing === "FILL";
+  }
+  return isSceneStretchedOnAxis(fallbackNode, axis, parentLayoutMode) || defaultFill;
+}
+function getSerializedAxisSizing(node, axis) {
+  if (node == null) {
+    return null;
+  }
+  const layoutSizing = axis === "horizontal" ? node.layout.layoutSizingHorizontal : node.layout.layoutSizingVertical;
+  if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
+    return layoutSizing;
+  }
+  const axisSizing = axisMatchesPrimaryAxis(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
+  if (axisSizing === "AUTO") {
+    return "HUG";
+  }
+  if (axisSizing === "FIXED") {
+    return "FIXED";
+  }
+  return null;
+}
+function getSceneAxisSizing(node, axis, parentLayoutMode) {
+  if (axis === "horizontal" && "layoutSizingHorizontal" in node) {
+    return node.layoutSizingHorizontal;
+  }
+  if (axis === "vertical" && "layoutSizingVertical" in node) {
+    return node.layoutSizingVertical;
+  }
+  if ("layoutGrow" in node && node.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
+    return "FILL";
+  }
+  return null;
+}
+function axisMatchesPrimaryAxis(node, axis) {
+  return axis === "horizontal" ? node.layout.layoutMode === "HORIZONTAL" : node.layout.layoutMode === "VERTICAL";
+}
+function axisMatchesPrimaryParentAxis(parentLayoutMode, axis) {
+  return axis === "horizontal" ? parentLayoutMode === "HORIZONTAL" : parentLayoutMode === "VERTICAL";
+}
+function axisMatchesCrossAxis(parentLayoutMode, axis) {
+  return axis === "horizontal" ? parentLayoutMode === "VERTICAL" : parentLayoutMode === "HORIZONTAL";
+}
+function isSceneStretchedOnAxis(node, axis, parentLayoutMode) {
+  return "layoutAlign" in node && node.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis);
+}
+function isRootResponsiveNode(node) {
+  return isImportableFrameNode(node) && node.parent === figma.currentPage;
+}
+function hasAutoLayout(node) {
+  return "layoutMode" in node;
+}
+function canResize(node) {
+  return "resize" in node && typeof node.resize === "function";
+}
+function getDeviceLabel(targetDevice) {
+  if (targetDevice === "mobile") {
+    return "Mobile";
+  }
+  if (targetDevice === "tablet") {
+    return "Tablet";
+  }
+  if (targetDevice === "desktop") {
+    return "Desktop";
+  }
+  return "Custom";
+}
+function serializeFrame(node) {
+  const rootBounds = getAbsoluteBounds(node);
+  return __spreadProps(__spreadValues({}, serializeNode({
+    node,
+    isRoot: true,
+    rootBounds,
+    parentBounds: null,
+    parentId: null,
+    depth: 0,
+    siblingIndex: 0,
+    siblingCount: 1
+  })), {
+    type: node.type,
+    schemaVersion: 1,
+    importedAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+function serializeNode({
+  node,
+  isRoot = false,
+  rootBounds,
+  parentBounds,
+  parentId,
+  depth,
+  siblingIndex,
+  siblingCount
+}) {
+  const absoluteBounds = getAbsoluteBounds(node);
+  const parentRelativeBounds = getRelativeBounds(absoluteBounds, parentBounds != null ? parentBounds : absoluteBounds);
+  const rootRelativeBounds = getRelativeBounds(absoluteBounds, rootBounds);
+  const percentOfParent = parentBounds == null ? void 0 : getPercentBounds(parentRelativeBounds, parentBounds);
+  const percentOfRoot = getPercentBounds(rootRelativeBounds, rootBounds);
+  return {
+    id: node.id,
+    name: node.name,
+    type: node.type,
+    responsive: serializeResponsiveMetadata(node, isRoot),
+    visible: readBoolean(node, "visible", true),
+    locked: readBoolean(node, "locked", false),
+    geometry: {
+      x: readNumber(node, "x", 0),
+      y: readNumber(node, "y", 0),
+      width: readNumber(node, "width", 0),
+      height: readNumber(node, "height", 0),
+      rotation: readNumber(node, "rotation", 0),
+      absoluteBounds,
+      parentRelativeBounds,
+      rootRelativeBounds,
+      percentOfParent,
+      percentOfRoot,
+      hierarchy: {
+        parentId,
+        depth,
+        siblingIndex,
+        siblingCount
+      }
+    },
+    layout: serializeLayout(node),
+    style: serializeStyle(node),
+    text: node.type === "TEXT" ? serializeText(node) : void 0,
+    children: hasChildren(node) ? node.children.map((child, index) => serializeNode({
+      node: child,
+      rootBounds,
+      parentBounds: absoluteBounds,
+      parentId: node.id,
+      depth: depth + 1,
+      siblingIndex: index,
+      siblingCount: node.children.length
+    })) : []
+  };
+}
+function serializeLayout(node) {
+  const layout = {
+    isAutoLayout: isAutoLayoutContainer(node)
+  };
+  if ("constraints" in node) {
+    layout.constraints = toJsonValue(node.constraints);
+  }
+  if ("layoutMode" in node) {
+    layout.layoutMode = node.layoutMode;
+    layout.autoLayoutDirection = node.layoutMode;
+  }
+  if ("layoutAlign" in node) {
+    layout.layoutAlign = node.layoutAlign;
+  }
+  if ("layoutGrow" in node) {
+    layout.layoutGrow = node.layoutGrow;
+  }
+  if ("layoutSizingHorizontal" in node) {
+    layout.layoutSizingHorizontal = node.layoutSizingHorizontal;
+  }
+  if ("layoutSizingVertical" in node) {
+    layout.layoutSizingVertical = node.layoutSizingVertical;
+  }
+  if ("itemSpacing" in node) {
+    layout.itemSpacing = node.itemSpacing;
+  }
+  if ("counterAxisSpacing" in node && node.counterAxisSpacing != null) {
+    layout.counterAxisSpacing = node.counterAxisSpacing;
+  }
+  if ("primaryAxisAlignItems" in node) {
+    layout.primaryAxisAlignItems = node.primaryAxisAlignItems;
+  }
+  if ("counterAxisAlignItems" in node) {
+    layout.counterAxisAlignItems = node.counterAxisAlignItems;
+  }
+  if ("layoutWrap" in node) {
+    layout.layoutWrap = node.layoutWrap;
+  }
+  if ("paddingTop" in node && "paddingRight" in node && "paddingBottom" in node && "paddingLeft" in node) {
+    layout.padding = {
+      top: node.paddingTop,
+      right: node.paddingRight,
+      bottom: node.paddingBottom,
+      left: node.paddingLeft
+    };
+  }
+  if ("primaryAxisSizingMode" in node) {
+    layout.primaryAxisSizingMode = node.primaryAxisSizingMode;
+  }
+  if ("counterAxisSizingMode" in node) {
+    layout.counterAxisSizingMode = node.counterAxisSizingMode;
+  }
+  return layout;
+}
+function serializeResponsiveMetadata(node, isRoot) {
+  const isAutoLayout = isAutoLayoutContainer(node);
+  return {
+    groupRole: isRoot ? "root" : void 0,
+    conversionRole: isAutoLayout ? "auto-layout-container" : "manual-layer",
+    acceptsChildren: hasChildren(node)
+  };
+}
+function serializeStyle(node) {
+  const style = {};
+  if ("opacity" in node) {
+    style.opacity = node.opacity;
+  }
+  if ("blendMode" in node) {
+    style.blendMode = node.blendMode;
+  }
+  if ("fills" in node && node.fills !== figma.mixed) {
+    style.fills = toJsonValue(node.fills);
+  }
+  if ("strokes" in node) {
+    style.strokes = toJsonValue(node.strokes);
+  }
+  if ("strokeWeight" in node && node.strokeWeight !== figma.mixed) {
+    style.strokeWeight = node.strokeWeight;
+  }
+  if ("cornerRadius" in node) {
+    style.cornerRadius = node.cornerRadius === figma.mixed ? "mixed" : node.cornerRadius;
+  }
+  if ("effects" in node) {
+    style.effects = toJsonValue(node.effects);
+  }
+  return style;
+}
+function serializeText(node) {
+  return {
+    characters: node.characters,
+    fontSize: node.fontSize === figma.mixed ? "mixed" : node.fontSize,
+    fontName: toJsonValue(node.fontName),
+    fontWeight: node.fontWeight === figma.mixed ? void 0 : node.fontWeight,
+    textAlignHorizontal: node.textAlignHorizontal,
+    textAlignVertical: node.textAlignVertical,
+    lineHeight: toJsonValue(node.lineHeight),
+    letterSpacing: toJsonValue(node.letterSpacing)
+  };
+}
+function isImportableFrameNode(node) {
+  return node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE";
+}
+function isAutoLayoutContainer(node) {
+  return "layoutMode" in node && node.layoutMode !== "NONE";
+}
+function hasChildren(node) {
+  return "children" in node;
+}
+function readNumber(node, key, fallback) {
+  const value = node[key];
+  return typeof value === "number" ? value : fallback;
+}
+function readBoolean(node, key, fallback) {
+  const value = node[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+function getAbsoluteBounds(node) {
+  var _a, _b, _c, _d;
+  const absoluteBoundingBox = "absoluteBoundingBox" in node ? node.absoluteBoundingBox : null;
+  const x = (_a = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.x) != null ? _a : readNumber(node, "x", 0);
+  const y = (_b = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.y) != null ? _b : readNumber(node, "y", 0);
+  const width = (_c = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.width) != null ? _c : readNumber(node, "width", 0);
+  const height = (_d = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.height) != null ? _d : readNumber(node, "height", 0);
+  return createBounds(x, y, width, height);
+}
+function getRelativeBounds(bounds, origin) {
+  return createBounds(
+    bounds.x - origin.x,
+    bounds.y - origin.y,
+    bounds.width,
+    bounds.height
+  );
+}
+function getPercentBounds(bounds, container) {
+  return {
+    x: toPercent(bounds.x, container.width),
+    y: toPercent(bounds.y, container.height),
+    width: toPercent(bounds.width, container.width),
+    height: toPercent(bounds.height, container.height),
+    right: toPercent(bounds.right, container.width),
+    bottom: toPercent(bounds.bottom, container.height)
+  };
+}
+function createBounds(x, y, width, height) {
+  const roundedX = roundLayoutNumber(x);
+  const roundedY = roundLayoutNumber(y);
+  const roundedWidth = roundLayoutNumber(width);
+  const roundedHeight = roundLayoutNumber(height);
+  return {
+    x: roundedX,
+    y: roundedY,
+    width: roundedWidth,
+    height: roundedHeight,
+    right: roundLayoutNumber(roundedX + roundedWidth),
+    bottom: roundLayoutNumber(roundedY + roundedHeight),
+    centerX: roundLayoutNumber(roundedX + roundedWidth / 2),
+    centerY: roundLayoutNumber(roundedY + roundedHeight / 2)
+  };
+}
+function toPercent(value, total) {
+  return total === 0 ? 0 : roundLayoutNumber(value / total * 100);
+}
+function roundLayoutNumber(value) {
+  return Math.round(value * 1e3) / 1e3;
+}
+function clampNumber(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+function toJsonValue(value) {
+  if (value === figma.mixed) {
+    return "mixed";
+  }
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonValue(item));
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, toJsonValue(entry)])
+    );
+  }
+  return String(value);
+}
+function sendToUi(message) {
+  figma.ui.postMessage(message);
+}
+var init_main = __esm({
+  "src/main.ts"() {
+    "use strict";
+    init_lib();
+  }
+});
+
+// <stdin>
+var modules = { "src/main.ts--default": (init_main(), __toCommonJS(main_exports))["default"] };
+var commandId = true ? "src/main.ts--default" : figma.command;
+modules[commandId]();

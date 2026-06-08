@@ -360,7 +360,11 @@ function SourceFrameCard({
         onClick={onToggleJsonImport}
         class="mt-2 w-full rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-gray-600 transition hover:border-gray-300 hover:bg-white hover:text-gray-900"
       >
-        Import JSON
+        Import JSON 
+        <span class="bg-red-600 text-white mx-2">
+
+        "TEST DEV"
+        </span>
       </button>
     </div>
   )

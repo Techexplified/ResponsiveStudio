@@ -30,6 +30,7 @@ declare const styles: {
   readonly "bg-green-500": string;
   readonly "bg-red-200": string;
   readonly "bg-red-50": string;
+  readonly "bg-red-600": string;
   readonly "bg-transparent": string;
   readonly "bg-white": string;
   readonly "bg-white/70": string;
@@ -213,6 +214,7 @@ declare const styles: {
   readonly "mt-6": string;
   readonly "mt-7": string;
   readonly "mt-8": string;
+  readonly "mx-2": string;
   readonly "mx-auto": string;
   readonly "my-4": string;
   readonly "opacity-0": string;
