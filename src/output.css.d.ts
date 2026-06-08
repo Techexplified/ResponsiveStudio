@@ -48,6 +48,7 @@ declare const styles: {
   readonly "border-[#0f766e]/30": string;
   readonly "border-[#111827]/20": string;
   readonly "border-[#5b35f5]": string;
+  readonly "border-[#5eead4]/40": string;
   readonly "border-[#cbd5e1]": string;
   readonly "border-[#d1d5db]": string;
   readonly "border-[#d97706]": string;
@@ -155,6 +156,7 @@ declare const styles: {
   readonly "h-px": string;
   readonly "h-screen": string;
   readonly "hidden": string;
+  readonly "hover:bg-[#0d9488]": string;
   readonly "hover:bg-[#115e59]": string;
   readonly "hover:bg-[#4c2ee0]": string;
   readonly "hover:bg-[#ccfbf1]": string;
@@ -288,6 +290,7 @@ declare const styles: {
   readonly "scale-0": string;
   readonly "scale-100": string;
   readonly "shadow-2xl": string;
+  readonly "shadow-[inset_0_0_0_2px_rgba(248,113,113,0.75)]": string;
   readonly "shadow-sm": string;
   readonly "shadow-xl": string;
   readonly "shrink-0": string;
@@ -323,6 +326,7 @@ declare const styles: {
   readonly "text-green-500": string;
   readonly "text-left": string;
   readonly "text-lg": string;
+  readonly "text-red-300": string;
   readonly "text-red-600": string;
   readonly "text-red-700": string;
   readonly "text-right": string;

@@ -427,9 +427,9 @@
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/f6f1bafe-ecdc-497d-85f7-0aba5ad8c644/base.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/11f3de91-90d7-424b-b678-55c819fc7ec4/base.js
   var init_base = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/f6f1bafe-ecdc-497d-85f7-0aba5ad8c644/base.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/11f3de91-90d7-424b-b678-55c819fc7ec4/base.js"() {
       if (document.getElementById("0a792085d1") === null) {
         const element = document.createElement("style");
         element.id = "0a792085d1";
@@ -578,9 +578,9 @@ svg {
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/836c3db9-f371-478d-b3f9-9c0199dceb5a/output.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/66d46f59-1414-44cb-8131-5226c3062222/output.js
   var init_output = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/836c3db9-f371-478d-b3f9-9c0199dceb5a/output.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/66d46f59-1414-44cb-8131-5226c3062222/output.js"() {
       if (document.getElementById("db1a1ac058") === null) {
         const element = document.createElement("style");
         element.id = "db1a1ac058";
@@ -595,6 +595,7 @@ svg {
       "Courier New", monospace;
     --color-red-50: oklch(97.1% 0.013 17.38);
     --color-red-200: oklch(88.5% 0.062 18.334);
+    --color-red-300: oklch(80.8% 0.114 19.571);
     --color-red-600: oklch(57.7% 0.245 27.325);
     --color-red-700: oklch(50.5% 0.213 27.518);
     --color-orange-200: oklch(90.1% 0.076 70.697);
@@ -1445,6 +1446,9 @@ svg {
   .border-\\[\\#5b35f5\\] {
     border-color: #5b35f5 !important;
   }
+  .border-\\[\\#5eead4\\]\\/40 {
+    border-color: color-mix(in oklab, #5eead4 40%, transparent) !important;
+  }
   .border-\\[\\#111827\\]\\/20 {
     border-color: color-mix(in oklab, #111827 20%, transparent) !important;
   }
@@ -1851,6 +1855,9 @@ svg {
   .text-green-500 {
     color: var(--color-green-500) !important;
   }
+  .text-red-300 {
+    color: var(--color-red-300) !important;
+  }
   .text-red-600 {
     color: var(--color-red-600) !important;
   }
@@ -1880,6 +1887,10 @@ svg {
   }
   .shadow-2xl {
     --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color, rgb(0 0 0 / 0.25)) !important;
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) !important;
+  }
+  .shadow-\\[inset_0_0_0_2px_rgba\\(248\\,113\\,113\\,0\\.75\\)\\] {
+    --tw-shadow: inset 0 0 0 2px var(--tw-shadow-color, rgba(248,113,113,0.75)) !important;
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow) !important;
   }
   .shadow-sm {
@@ -1971,6 +1982,13 @@ svg {
     &:hover {
       @media (hover: hover) {
         border-color: var(--color-gray-300) !important;
+      }
+    }
+  }
+  .hover\\:bg-\\[\\#0d9488\\] {
+    &:hover {
+      @media (hover: hover) {
+        background-color: #0d9488 !important;
       }
     }
   }
@@ -2378,6 +2396,7 @@ svg {
       rootBounds,
       parentBounds: null,
       parentId: null,
+      parentLayoutMode: null,
       depth: 0,
       siblingIndex: 0,
       siblingCount: 1,
@@ -2545,13 +2564,13 @@ svg {
     return normalized;
   }
   function normalizeLayout(layout) {
-    var _a;
+    var _a, _b;
     const normalized = {};
-    const mode = readLayoutMode((_a = layout.layoutMode) != null ? _a : layout.autoLayoutDirection);
-    if (mode != null && mode !== "NONE") {
+    const mode = (_b = readLayoutMode((_a = layout.layoutMode) != null ? _a : layout.autoLayoutDirection)) != null ? _b : "NONE";
+    if (mode !== "NONE") {
       normalized.mode = mode;
     }
-    if (layout.constraints != null) {
+    if (layout.constraints != null && !isDefaultMinConstraints(layout.constraints)) {
       normalized.constraints = cloneJsonValue(layout.constraints);
     }
     if (layout.layoutSizingHorizontal != null && layout.layoutSizingHorizontal !== "FIXED") {
@@ -2570,7 +2589,7 @@ svg {
       normalized.gap = layout.itemSpacing;
     }
     if (typeof layout.counterAxisSpacing === "number" && layout.counterAxisSpacing !== 0) {
-      normalized.counterAxisSpacing = layout.counterAxisSpacing;
+      normalized.counterGap = layout.counterAxisSpacing;
     }
     if (layout.primaryAxisAlignItems != null && layout.primaryAxisAlignItems !== "MIN") {
       normalized.primaryAlign = layout.primaryAxisAlignItems;
@@ -2587,17 +2606,17 @@ svg {
     if (layout.margin != null && !isDefaultSpacing(layout.margin)) {
       normalized.margin = cloneSpacing(layout.margin);
     }
-    addAxisSizingIfNeeded(normalized, layout, mode != null ? mode : "NONE");
+    addAxisSizingIfNeeded(normalized, layout, mode);
     return normalized;
   }
   function addAxisSizingIfNeeded(normalized, layout, mode) {
     const inferredPrimary = inferPrimaryAxisSizing(layout, mode);
     const inferredCounter = inferCounterAxisSizing(layout, mode);
     if (layout.primaryAxisSizingMode != null && layout.primaryAxisSizingMode !== inferredPrimary) {
-      normalized.primaryAxisSizingMode = layout.primaryAxisSizingMode;
+      normalized.primarySizing = layout.primaryAxisSizingMode;
     }
     if (layout.counterAxisSizingMode != null && layout.counterAxisSizingMode !== inferredCounter) {
-      normalized.counterAxisSizingMode = layout.counterAxisSizingMode;
+      normalized.counterSizing = layout.counterAxisSizingMode;
     }
   }
   function normalizeStyle(style) {
@@ -2608,11 +2627,11 @@ svg {
     if (style.blendMode != null && style.blendMode !== "PASS_THROUGH") {
       normalized.blendMode = style.blendMode;
     }
-    if (style.fills != null) {
-      normalized.fills = cloneJsonValue(style.fills);
+    if (style.fills != null && !isEmptyJsonArray(style.fills)) {
+      normalized.fills = compactPaintArray(style.fills);
     }
     if (style.strokes != null && !isEmptyJsonArray(style.strokes)) {
-      normalized.strokes = cloneJsonValue(style.strokes);
+      normalized.strokes = compactPaintArray(style.strokes);
     }
     if (typeof style.strokeWeight === "number" && style.strokeWeight !== 1) {
       normalized.strokeWeight = style.strokeWeight;
@@ -2709,12 +2728,15 @@ svg {
       geometry.width,
       geometry.height
     );
-    const children = node.children.map((child, index) => denormalizeNode(child, __spreadProps(__spreadValues({}, context), {
+    const nodeChildren = getNodeChildren(node);
+    const layout = denormalizeLayout(node.layout, context.parentLayoutMode);
+    const children = nodeChildren.map((child, index) => denormalizeNode(child, __spreadProps(__spreadValues({}, context), {
       parentBounds: absoluteBounds,
       parentId: node.id,
+      parentLayoutMode: layout.layoutMode === "GRID" || layout.layoutMode === "HORIZONTAL" || layout.layoutMode === "VERTICAL" ? layout.layoutMode : null,
       depth: context.depth + 1,
       siblingIndex: index,
-      siblingCount: node.children.length
+      siblingCount: nodeChildren.length
     })));
     return {
       id: node.id,
@@ -2742,7 +2764,7 @@ svg {
           siblingCount: context.siblingCount
         }
       },
-      layout: denormalizeLayout(node.layout),
+      layout,
       style: denormalizeStyle(node, context.styles),
       text: node.text == null ? void 0 : cloneJsonObject(node.text),
       component: node.component == null ? void 0 : cloneJsonValue(node.component),
@@ -2751,29 +2773,31 @@ svg {
       children
     };
   }
-  function denormalizeLayout(layout) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
-    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
-    const horizontalSizing = (_b = layout == null ? void 0 : layout.horizontalSizing) != null ? _b : "FIXED";
-    const verticalSizing = (_c = layout == null ? void 0 : layout.verticalSizing) != null ? _c : "FIXED";
+  function denormalizeLayout(layout, parentLayoutMode) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    const mode = getStoredLayoutMode(layout);
+    const horizontalSizing = (_a = layout == null ? void 0 : layout.horizontalSizing) != null ? _a : inferNodeAxisLayoutSizing(layout, mode, "horizontal", parentLayoutMode);
+    const verticalSizing = (_b = layout == null ? void 0 : layout.verticalSizing) != null ? _b : inferNodeAxisLayoutSizing(layout, mode, "vertical", parentLayoutMode);
+    const primarySizing = (_c = layout == null ? void 0 : layout.primarySizing) != null ? _c : inferPrimaryAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing);
+    const counterSizing = (_d = layout == null ? void 0 : layout.counterSizing) != null ? _d : inferCounterAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing);
     return {
-      isAutoLayout: (_d = layout == null ? void 0 : layout.isAutoLayout) != null ? _d : mode === "HORIZONTAL" || mode === "VERTICAL",
+      isAutoLayout: (_e = layout == null ? void 0 : layout.isAutoLayout) != null ? _e : isLayoutModeActive(mode),
       autoLayoutDirection: mode,
       constraints: (layout == null ? void 0 : layout.constraints) == null ? void 0 : cloneJsonValue(layout.constraints),
       layoutMode: mode,
-      layoutAlign: (_e = layout == null ? void 0 : layout.align) != null ? _e : "INHERIT",
-      layoutGrow: (_f = layout == null ? void 0 : layout.grow) != null ? _f : 0,
+      layoutAlign: (_f = layout == null ? void 0 : layout.align) != null ? _f : "INHERIT",
+      layoutGrow: (_g = layout == null ? void 0 : layout.grow) != null ? _g : 0,
       layoutSizingHorizontal: horizontalSizing,
       layoutSizingVertical: verticalSizing,
-      itemSpacing: (_g = layout == null ? void 0 : layout.gap) != null ? _g : 0,
-      counterAxisSpacing: layout == null ? void 0 : layout.counterAxisSpacing,
-      primaryAxisAlignItems: (_h = layout == null ? void 0 : layout.primaryAlign) != null ? _h : "MIN",
-      counterAxisAlignItems: (_i = layout == null ? void 0 : layout.counterAlign) != null ? _i : "MIN",
+      itemSpacing: (_h = layout == null ? void 0 : layout.gap) != null ? _h : 0,
+      counterAxisSpacing: layout == null ? void 0 : layout.counterGap,
+      primaryAxisAlignItems: (_i = layout == null ? void 0 : layout.primaryAlign) != null ? _i : "MIN",
+      counterAxisAlignItems: (_j = layout == null ? void 0 : layout.counterAlign) != null ? _j : "MIN",
       layoutWrap: (layout == null ? void 0 : layout.wrap) === true ? "WRAP" : "NO_WRAP",
       padding: (layout == null ? void 0 : layout.padding) == null ? cloneSpacing(defaultSpacing) : cloneSpacing(layout.padding),
       margin: layout == null ? void 0 : layout.margin,
-      primaryAxisSizingMode: (_j = layout == null ? void 0 : layout.primaryAxisSizingMode) != null ? _j : inferPrimaryAxisSizingFromNormalized(layout),
-      counterAxisSizingMode: (_k = layout == null ? void 0 : layout.counterAxisSizingMode) != null ? _k : inferCounterAxisSizingFromNormalized(layout)
+      primaryAxisSizingMode: primarySizing,
+      counterAxisSizingMode: counterSizing
     };
   }
   function denormalizeStyle(node, styles) {
@@ -2783,8 +2807,8 @@ svg {
     return {
       opacity: (_a = style.opacity) != null ? _a : 1,
       blendMode: (_b = style.blendMode) != null ? _b : "PASS_THROUGH",
-      fills: style.fills == null ? void 0 : cloneJsonValue(style.fills),
-      strokes: style.strokes == null ? void 0 : cloneJsonValue(style.strokes),
+      fills: style.fills == null ? void 0 : restorePaintArray(style.fills),
+      strokes: style.strokes == null ? void 0 : restorePaintArray(style.strokes),
       strokeWeight: (_c = style.strokeWeight) != null ? _c : 1,
       cornerRadius: (_d = style.cornerRadius) != null ? _d : 0,
       effects: style.effects == null ? void 0 : cloneJsonValue(style.effects)
@@ -2799,8 +2823,8 @@ svg {
       responsive.conversionRole = inferResponsiveConversionRole({
         type: node.type,
         responsive: node.responsive,
-        children: node.children,
-        layout: denormalizeLayout(node.layout)
+        children: getNodeChildren(node),
+        layout: denormalizeLayout(node.layout, null)
       });
     }
     if (responsive.acceptsChildren == null) {
@@ -2944,6 +2968,9 @@ svg {
     };
   }
   function readChildren(input, path, issues, warnings) {
+    if (input == null) {
+      return [];
+    }
     if (!Array.isArray(input)) {
       issues.push({
         path,
@@ -2961,6 +2988,7 @@ svg {
     return children;
   }
   function readLayout(input, path, issues) {
+    var _a, _b, _c;
     if (input == null) {
       return void 0;
     }
@@ -2981,14 +3009,14 @@ svg {
     const grow = readOptionalNumber(record.grow, `${path}.grow`, issues);
     const align = readOptionalString(record.align, `${path}.align`, issues);
     const gap = readOptionalNumber(record.gap, `${path}.gap`, issues);
-    const counterAxisSpacing = readOptionalNumber(record.counterAxisSpacing, `${path}.counterAxisSpacing`, issues);
+    const counterGap = readOptionalNumber((_a = record.counterGap) != null ? _a : record.counterAxisSpacing, `${path}.counterGap`, issues);
     const primaryAlign = readOptionalString(record.primaryAlign, `${path}.primaryAlign`, issues);
     const counterAlign = readOptionalString(record.counterAlign, `${path}.counterAlign`, issues);
     const wrap = readOptionalBoolean(record.wrap, `${path}.wrap`, issues);
     const padding = readSpacing(record.padding, `${path}.padding`, issues);
     const margin = readSpacing(record.margin, `${path}.margin`, issues);
-    const primaryAxisSizingMode = readOptionalString(record.primaryAxisSizingMode, `${path}.primaryAxisSizingMode`, issues);
-    const counterAxisSizingMode = readOptionalString(record.counterAxisSizingMode, `${path}.counterAxisSizingMode`, issues);
+    const primarySizing = readOptionalString((_b = record.primarySizing) != null ? _b : record.primaryAxisSizingMode, `${path}.primarySizing`, issues);
+    const counterSizing = readOptionalString((_c = record.counterSizing) != null ? _c : record.counterAxisSizingMode, `${path}.counterSizing`, issues);
     if (mode != null) {
       layout.mode = mode;
     }
@@ -3013,8 +3041,8 @@ svg {
     if (gap != null) {
       layout.gap = gap;
     }
-    if (counterAxisSpacing != null) {
-      layout.counterAxisSpacing = counterAxisSpacing;
+    if (counterGap != null) {
+      layout.counterGap = counterGap;
     }
     if (primaryAlign != null) {
       layout.primaryAlign = primaryAlign;
@@ -3031,11 +3059,11 @@ svg {
     if (margin != null) {
       layout.margin = margin;
     }
-    if (primaryAxisSizingMode != null) {
-      layout.primaryAxisSizingMode = primaryAxisSizingMode;
+    if (primarySizing != null) {
+      layout.primarySizing = primarySizing;
     }
-    if (counterAxisSizingMode != null) {
-      layout.counterAxisSizingMode = counterAxisSizingMode;
+    if (counterSizing != null) {
+      layout.counterSizing = counterSizing;
     }
     return layout;
   }
@@ -3281,16 +3309,18 @@ svg {
       root: restoreNormalizedNodeDefaults(document2.root)
     });
   }
-  function restoreNormalizedNodeDefaults(node) {
-    var _a, _b, _c;
+  function restoreNormalizedNodeDefaults(node, parentLayoutMode = null) {
+    var _a, _b, _c, _d, _e;
+    const layout = restoreLayoutDefaults(node.layout, parentLayoutMode);
+    const nextParentLayoutMode = isLayoutModeActive((_a = layout.mode) != null ? _a : "NONE") ? (_b = layout.mode) != null ? _b : "NONE" : null;
     return __spreadProps(__spreadValues({}, node), {
-      visible: (_a = node.visible) != null ? _a : true,
-      locked: (_b = node.locked) != null ? _b : false,
+      visible: (_c = node.visible) != null ? _c : true,
+      locked: (_d = node.locked) != null ? _d : false,
       geometry: restoreGeometryDefaults(node.geometry),
-      layout: restoreLayoutDefaults(node.layout),
+      layout,
       style: restoreStyleDefaults(node.style),
-      text: (_c = node.text) != null ? _c : null,
-      children: node.children.map((child) => restoreNormalizedNodeDefaults(child))
+      text: (_e = node.text) != null ? _e : null,
+      children: getNodeChildren(node).map((child) => restoreNormalizedNodeDefaults(child, nextParentLayoutMode))
     });
   }
   function restoreGeometryDefaults(geometry) {
@@ -3303,26 +3333,28 @@ svg {
       rotation: (_a = geometry.rotation) != null ? _a : 0
     };
   }
-  function restoreLayoutDefaults(layout) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
-    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
+  function restoreLayoutDefaults(layout, parentLayoutMode) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    const mode = getStoredLayoutMode(layout);
+    const horizontalSizing = (_a = layout == null ? void 0 : layout.horizontalSizing) != null ? _a : inferNodeAxisLayoutSizing(layout, mode, "horizontal", parentLayoutMode);
+    const verticalSizing = (_b = layout == null ? void 0 : layout.verticalSizing) != null ? _b : inferNodeAxisLayoutSizing(layout, mode, "vertical", parentLayoutMode);
     return {
-      isAutoLayout: (_b = layout == null ? void 0 : layout.isAutoLayout) != null ? _b : mode === "HORIZONTAL" || mode === "VERTICAL",
+      isAutoLayout: (_c = layout == null ? void 0 : layout.isAutoLayout) != null ? _c : isLayoutModeActive(mode),
       mode,
       constraints: layout == null ? void 0 : layout.constraints,
-      horizontalSizing: (_c = layout == null ? void 0 : layout.horizontalSizing) != null ? _c : "FIXED",
-      verticalSizing: (_d = layout == null ? void 0 : layout.verticalSizing) != null ? _d : "FIXED",
-      grow: (_e = layout == null ? void 0 : layout.grow) != null ? _e : 0,
-      align: (_f = layout == null ? void 0 : layout.align) != null ? _f : "INHERIT",
-      gap: (_g = layout == null ? void 0 : layout.gap) != null ? _g : 0,
-      counterAxisSpacing: layout == null ? void 0 : layout.counterAxisSpacing,
-      primaryAlign: (_h = layout == null ? void 0 : layout.primaryAlign) != null ? _h : "MIN",
-      counterAlign: (_i = layout == null ? void 0 : layout.counterAlign) != null ? _i : "MIN",
-      wrap: (_j = layout == null ? void 0 : layout.wrap) != null ? _j : false,
+      horizontalSizing,
+      verticalSizing,
+      grow: (_d = layout == null ? void 0 : layout.grow) != null ? _d : 0,
+      align: (_e = layout == null ? void 0 : layout.align) != null ? _e : "INHERIT",
+      gap: (_f = layout == null ? void 0 : layout.gap) != null ? _f : 0,
+      counterGap: layout == null ? void 0 : layout.counterGap,
+      primaryAlign: (_g = layout == null ? void 0 : layout.primaryAlign) != null ? _g : "MIN",
+      counterAlign: (_h = layout == null ? void 0 : layout.counterAlign) != null ? _h : "MIN",
+      wrap: (_i = layout == null ? void 0 : layout.wrap) != null ? _i : false,
       padding: (layout == null ? void 0 : layout.padding) == null ? cloneSpacing(defaultSpacing) : cloneSpacing(layout.padding),
       margin: layout == null ? void 0 : layout.margin,
-      primaryAxisSizingMode: (_k = layout == null ? void 0 : layout.primaryAxisSizingMode) != null ? _k : inferPrimaryAxisSizingFromNormalized(layout),
-      counterAxisSizingMode: (_l = layout == null ? void 0 : layout.counterAxisSizingMode) != null ? _l : inferCounterAxisSizingFromNormalized(layout)
+      primarySizing: (_j = layout == null ? void 0 : layout.primarySizing) != null ? _j : inferPrimaryAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing),
+      counterSizing: (_k = layout == null ? void 0 : layout.counterSizing) != null ? _k : inferCounterAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing)
     };
   }
   function restoreStyleDefaults(style) {
@@ -3349,12 +3381,12 @@ svg {
     };
   }
   function compactNormalizedNode(node) {
+    const children = getNodeChildren(node).map((child) => compactNormalizedNode(child));
     const compact = {
       id: node.id,
       name: node.name,
       type: node.type,
-      geometry: compactGeometry(node.geometry),
-      children: node.children.map((child) => compactNormalizedNode(child))
+      geometry: compactGeometry(node.geometry)
     };
     const layout = compactLayout(node.layout);
     const style = compactStyle(node.style);
@@ -3392,6 +3424,9 @@ svg {
     if (node.metadata != null) {
       compact.metadata = cloneJsonObject(node.metadata);
     }
+    if (children.length > 0) {
+      compact.children = children;
+    }
     return compact;
   }
   function compactGeometry(geometry) {
@@ -3408,7 +3443,7 @@ svg {
     return compact;
   }
   function compactLayout(layout) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     if (layout == null) {
       return void 0;
     }
@@ -3416,7 +3451,7 @@ svg {
     if (layout.mode != null && layout.mode !== "NONE") {
       compact.mode = layout.mode;
     }
-    if (layout.constraints != null) {
+    if (layout.constraints != null && !isDefaultMinConstraints(layout.constraints)) {
       compact.constraints = cloneJsonValue(layout.constraints);
     }
     if (layout.horizontalSizing != null && layout.horizontalSizing !== "FIXED") {
@@ -3434,8 +3469,8 @@ svg {
     if (((_b = layout.gap) != null ? _b : 0) !== 0) {
       compact.gap = layout.gap;
     }
-    if (((_c = layout.counterAxisSpacing) != null ? _c : 0) !== 0) {
-      compact.counterAxisSpacing = layout.counterAxisSpacing;
+    if (((_c = layout.counterGap) != null ? _c : 0) !== 0) {
+      compact.counterGap = layout.counterGap;
     }
     if (layout.primaryAlign != null && layout.primaryAlign !== "MIN") {
       compact.primaryAlign = layout.primaryAlign;
@@ -3452,13 +3487,16 @@ svg {
     if (layout.margin != null && !isDefaultSpacing(layout.margin)) {
       compact.margin = cloneSpacing(layout.margin);
     }
-    const inferredPrimary = inferPrimaryAxisSizingFromNormalized(layout);
-    const inferredCounter = inferCounterAxisSizingFromNormalized(layout);
-    if (layout.primaryAxisSizingMode != null && layout.primaryAxisSizingMode !== inferredPrimary) {
-      compact.primaryAxisSizingMode = layout.primaryAxisSizingMode;
+    const mode = getStoredLayoutMode(layout);
+    const horizontalSizing = (_d = layout.horizontalSizing) != null ? _d : inferNodeAxisLayoutSizing(layout, mode, "horizontal", null);
+    const verticalSizing = (_e = layout.verticalSizing) != null ? _e : inferNodeAxisLayoutSizing(layout, mode, "vertical", null);
+    const inferredPrimary = inferPrimaryAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing);
+    const inferredCounter = inferCounterAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing);
+    if (layout.primarySizing != null && layout.primarySizing !== inferredPrimary) {
+      compact.primarySizing = layout.primarySizing;
     }
-    if (layout.counterAxisSizingMode != null && layout.counterAxisSizingMode !== inferredCounter) {
-      compact.counterAxisSizingMode = layout.counterAxisSizingMode;
+    if (layout.counterSizing != null && layout.counterSizing !== inferredCounter) {
+      compact.counterSizing = layout.counterSizing;
     }
     return isEmptyRecord(compact) ? void 0 : compact;
   }
@@ -3474,11 +3512,11 @@ svg {
     if (style.blendMode != null && style.blendMode !== "PASS_THROUGH") {
       compact.blendMode = style.blendMode;
     }
-    if (style.fills != null) {
-      compact.fills = cloneJsonValue(style.fills);
+    if (style.fills != null && !isEmptyJsonArray(style.fills)) {
+      compact.fills = compactPaintArray(style.fills);
     }
     if (style.strokes != null && !isEmptyJsonArray(style.strokes)) {
-      compact.strokes = cloneJsonValue(style.strokes);
+      compact.strokes = compactPaintArray(style.strokes);
     }
     if (((_b = style.strokeWeight) != null ? _b : 1) !== 1) {
       compact.strokeWeight = style.strokeWeight;
@@ -3506,24 +3544,66 @@ svg {
     return cloneJsonObject(responsive);
   }
   function inferPrimaryAxisSizing(layout, mode) {
-    const sizing = mode === "HORIZONTAL" ? layout.layoutSizingHorizontal : layout.layoutSizingVertical;
-    return sizing === "HUG" ? "AUTO" : "FIXED";
+    var _a, _b;
+    return inferPrimaryAxisSizingFromLayoutSizing(
+      mode,
+      (_a = layout.layoutSizingHorizontal) != null ? _a : "FIXED",
+      (_b = layout.layoutSizingVertical) != null ? _b : "FIXED"
+    );
   }
   function inferCounterAxisSizing(layout, mode) {
-    const sizing = mode === "HORIZONTAL" ? layout.layoutSizingVertical : layout.layoutSizingHorizontal;
+    var _a, _b;
+    return inferCounterAxisSizingFromLayoutSizing(
+      mode,
+      (_a = layout.layoutSizingHorizontal) != null ? _a : "FIXED",
+      (_b = layout.layoutSizingVertical) != null ? _b : "FIXED"
+    );
+  }
+  function inferNodeAxisLayoutSizing(layout, mode, axis, parentLayoutMode) {
+    const ownAxisSizing = axisMatchesPrimaryAxis(mode, axis) ? layout == null ? void 0 : layout.primarySizing : layout == null ? void 0 : layout.counterSizing;
+    if (ownAxisSizing === "AUTO") {
+      return "HUG";
+    }
+    if (parentLayoutMode != null && (layout == null ? void 0 : layout.align) === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+      return "FILL";
+    }
+    if (parentLayoutMode != null && typeof (layout == null ? void 0 : layout.grow) === "number" && layout.grow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
+      return "FILL";
+    }
+    return "FIXED";
+  }
+  function inferPrimaryAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing) {
+    const sizing = mode === "HORIZONTAL" || mode === "GRID" ? horizontalSizing : verticalSizing;
     return sizing === "HUG" ? "AUTO" : "FIXED";
   }
-  function inferPrimaryAxisSizingFromNormalized(layout) {
-    var _a;
-    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
-    const sizing = mode === "HORIZONTAL" ? layout == null ? void 0 : layout.horizontalSizing : layout == null ? void 0 : layout.verticalSizing;
+  function inferCounterAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing) {
+    const sizing = mode === "HORIZONTAL" || mode === "GRID" ? verticalSizing : horizontalSizing;
     return sizing === "HUG" ? "AUTO" : "FIXED";
   }
-  function inferCounterAxisSizingFromNormalized(layout) {
+  function getStoredLayoutMode(layout) {
     var _a;
-    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
-    const sizing = mode === "HORIZONTAL" ? layout == null ? void 0 : layout.verticalSizing : layout == null ? void 0 : layout.horizontalSizing;
-    return sizing === "HUG" ? "AUTO" : "FIXED";
+    return (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
+  }
+  function isLayoutModeActive(mode) {
+    return mode !== "NONE";
+  }
+  function axisMatchesPrimaryAxis(mode, axis) {
+    if (mode === "GRID") {
+      return axis === "horizontal";
+    }
+    return axis === "horizontal" ? mode === "HORIZONTAL" : mode === "VERTICAL";
+  }
+  function axisMatchesPrimaryParentAxis(parentLayoutMode, axis) {
+    if (parentLayoutMode === "GRID") {
+      return axis === "horizontal";
+    }
+    return axis === "horizontal" ? parentLayoutMode === "HORIZONTAL" : parentLayoutMode === "VERTICAL";
+  }
+  function axisMatchesCrossAxis(parentLayoutMode, axis) {
+    if (parentLayoutMode === "GRID") {
+      return axis === "vertical";
+    }
+    return axis === "horizontal" ? parentLayoutMode === "VERTICAL" : parentLayoutMode === "HORIZONTAL";
   }
   function inferResponsiveConversionRole(node) {
     var _a;
@@ -3534,21 +3614,21 @@ svg {
   }
   function inferAcceptsChildren(node) {
     var _a;
-    return node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE" || node.type === "RESPONSIVE_GROUP" || ((_a = node.responsive) == null ? void 0 : _a.isVirtualGroup) === true || node.children.length > 0;
+    return node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE" || node.type === "RESPONSIVE_GROUP" || ((_a = node.responsive) == null ? void 0 : _a.isVirtualGroup) === true || getNodeChildren(node).length > 0;
   }
   function readLayoutMode(value) {
-    return value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL" ? value : null;
+    return value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL" || value === "GRID" ? value : null;
   }
   function readOptionalLayoutMode(value, path, issues) {
     if (value == null) {
       return void 0;
     }
-    if (value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL") {
+    if (value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL" || value === "GRID") {
       return value;
     }
     issues.push({
       path,
-      message: "Expected NONE, HORIZONTAL, or VERTICAL."
+      message: "Expected NONE, HORIZONTAL, VERTICAL, or GRID."
     });
     return void 0;
   }
@@ -3699,6 +3779,10 @@ svg {
   function asRecord(value) {
     return value != null && typeof value === "object" && !Array.isArray(value) ? value : null;
   }
+  function getNodeChildren(node) {
+    var _a;
+    return (_a = node.children) != null ? _a : [];
+  }
   function cloneSpacing(spacing) {
     return {
       top: spacing.top,
@@ -3716,11 +3800,67 @@ svg {
   function isDefaultSpacing(spacing) {
     return spacing.top === 0 && spacing.right === 0 && spacing.bottom === 0 && spacing.left === 0;
   }
+  function isDefaultMinConstraints(value) {
+    const constraints = asRecord(value);
+    return constraints != null && constraints.horizontal === "MIN" && constraints.vertical === "MIN" && Object.keys(constraints).every((key) => key === "horizontal" || key === "vertical");
+  }
   function isEmptyRecord(value) {
     return Object.keys(value).length === 0;
   }
   function isEmptyJsonArray(value) {
     return Array.isArray(value) && value.length === 0;
+  }
+  function compactPaintArray(value) {
+    if (!Array.isArray(value)) {
+      return cloneJsonValue(value);
+    }
+    return value.map((paint) => compactPaint(paint));
+  }
+  function compactPaint(value) {
+    const paint = asRecord(value);
+    if (paint == null) {
+      return cloneJsonValue(value);
+    }
+    const compact = {};
+    for (const [key, entry] of Object.entries(paint)) {
+      if (key === "visible" && entry === true) {
+        continue;
+      }
+      if (key === "opacity" && entry === 1) {
+        continue;
+      }
+      if (isFigmaJsonValue(entry)) {
+        compact[key] = cloneJsonValue(entry);
+      }
+    }
+    return compact;
+  }
+  function restorePaintArray(value) {
+    if (!Array.isArray(value)) {
+      return cloneJsonValue(value);
+    }
+    return value.map((paint) => restorePaint(paint));
+  }
+  function restorePaint(value) {
+    const paint = asRecord(value);
+    if (paint == null) {
+      return cloneJsonValue(value);
+    }
+    const restored = {};
+    for (const [key, entry] of Object.entries(paint)) {
+      if (isFigmaJsonValue(entry)) {
+        restored[key] = cloneJsonValue(entry);
+      }
+    }
+    if (typeof restored.type === "string") {
+      if (restored.visible == null) {
+        restored.visible = true;
+      }
+      if (restored.opacity == null) {
+        restored.opacity = 1;
+      }
+    }
+    return restored;
   }
   function isMergeableObject(value) {
     return asRecord(value) != null;
@@ -4693,28 +4833,28 @@ svg {
     if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
       return layoutSizing;
     }
-    const axisSizing = axisMatchesPrimaryAxis(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
+    const axisSizing = axisMatchesPrimaryAxis2(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
     if (axisSizing === "AUTO") {
       return "HUG";
     }
     if (axisSizing === "FIXED") {
       return "FIXED";
     }
-    if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis2(parentLayoutMode, axis)) {
       return "FILL";
     }
-    if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
+    if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis2(parentLayoutMode, axis)) {
       return "FILL";
     }
     return null;
   }
-  function axisMatchesPrimaryAxis(node, axis) {
+  function axisMatchesPrimaryAxis2(node, axis) {
     return axis === "horizontal" ? node.layout.layoutMode === "HORIZONTAL" : node.layout.layoutMode === "VERTICAL";
   }
-  function axisMatchesPrimaryParentAxis(parentLayoutMode, axis) {
+  function axisMatchesPrimaryParentAxis2(parentLayoutMode, axis) {
     return axis === "horizontal" ? parentLayoutMode === "HORIZONTAL" : parentLayoutMode === "VERTICAL";
   }
-  function axisMatchesCrossAxis(parentLayoutMode, axis) {
+  function axisMatchesCrossAxis2(parentLayoutMode, axis) {
     return axis === "horizontal" ? parentLayoutMode === "VERTICAL" : parentLayoutMode === "HORIZONTAL";
   }
   function getMainOffset(justify, mainSize, mainUsed) {
@@ -5514,28 +5654,28 @@ svg {
     if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
       return layoutSizing;
     }
-    const axisSizing = axisMatchesPrimaryAxis2(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
+    const axisSizing = axisMatchesPrimaryAxis3(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
     if (axisSizing === "AUTO") {
       return "HUG";
     }
     if (axisSizing === "FIXED") {
       return "FIXED";
     }
-    if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis2(parentLayoutMode, axis)) {
+    if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis3(parentLayoutMode, axis)) {
       return "FILL";
     }
-    if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis2(parentLayoutMode, axis)) {
+    if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis3(parentLayoutMode, axis)) {
       return "FILL";
     }
     return null;
   }
-  function axisMatchesPrimaryAxis2(node, axis) {
+  function axisMatchesPrimaryAxis3(node, axis) {
     return axis === "horizontal" ? node.layout.layoutMode === "HORIZONTAL" : node.layout.layoutMode === "VERTICAL";
   }
-  function axisMatchesPrimaryParentAxis2(parentLayoutMode, axis) {
+  function axisMatchesPrimaryParentAxis3(parentLayoutMode, axis) {
     return axis === "horizontal" ? parentLayoutMode === "HORIZONTAL" : parentLayoutMode === "VERTICAL";
   }
-  function axisMatchesCrossAxis2(parentLayoutMode, axis) {
+  function axisMatchesCrossAxis3(parentLayoutMode, axis) {
     return axis === "horizontal" ? parentLayoutMode === "VERTICAL" : parentLayoutMode === "HORIZONTAL";
   }
   function getEffectiveLayoutRules(node, layoutRules) {
@@ -5806,16 +5946,24 @@ svg {
         onClick: onToggle,
         class: "flex h-12 w-full items-center justify-between px-6 text-left transition hover:bg-white/5"
       },
-      /* @__PURE__ */ k("div", null, /* @__PURE__ */ k("h3", { class: "text-xs font-bold uppercase tracking-wide text-gray-300" }, "JSON Viewer"), /* @__PURE__ */ k("p", { class: "mt-0.5 text-[11px] text-gray-400" }, frame.children.length, " root children")),
-      /* @__PURE__ */ k("span", { class: "text-xs font-semibold text-[#5eead4]" }, isExpanded ? "Collapse" : "Expand")
+      /* @__PURE__ */ k("div", null, /* @__PURE__ */ k("h3", { class: "text-xs font-bold uppercase tracking-wide text-gray-300" }, "JSON Editor"), /* @__PURE__ */ k("p", { class: "mt-0.5 text-[11px] text-gray-400" }, frame.children.length, " root children")),
+      /* @__PURE__ */ k("span", { class: "text-xs font-semibold text-[#5eead4]" }, isExpanded ? "Collapse" : "Edit JSON")
     ));
   }
   function JsonViewerOverlay({
     frame,
+    onFrameChange,
     onClose
   }) {
     const [copyStatus, setCopyStatus] = d2("idle");
-    const json = serializeNormalizedJson(frame);
+    const [json, setJson] = d2(() => serializeNormalizedJson(frame));
+    const [editStatus, setEditStatus] = d2("idle");
+    const [validationMessage, setValidationMessage] = d2("");
+    y2(() => {
+      setJson(serializeNormalizedJson(frame));
+      setEditStatus("idle");
+      setValidationMessage("");
+    }, [frame]);
     async function copyJson() {
       const didCopy = await copyText(json);
       if (didCopy) {
@@ -5826,7 +5974,42 @@ svg {
       setCopyStatus("error");
       window.setTimeout(() => setCopyStatus("idle"), 1600);
     }
-    return /* @__PURE__ */ k("section", { class: "fixed inset-0 z-50 flex min-h-0 flex-col bg-[#111827] shadow-2xl" }, /* @__PURE__ */ k("header", { class: "flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-6" }, /* @__PURE__ */ k("div", null, /* @__PURE__ */ k("h3", { class: "text-xs font-bold uppercase tracking-wide text-gray-300" }, "JSON Viewer"), /* @__PURE__ */ k("p", { class: "mt-0.5 text-[11px] text-gray-400" }, frame.children.length, " root children")), /* @__PURE__ */ k("div", { class: "flex items-center gap-2" }, /* @__PURE__ */ k(
+    function applyJson() {
+      const result = deserializeNormalizedJson(json);
+      if (!result.ok) {
+        setEditStatus("error");
+        setValidationMessage(formatValidationErrors2(result.errors));
+        return;
+      }
+      const nextFrame = denormalizeFigmaJson(result.value);
+      onFrameChange(nextFrame);
+      setJson(serializeNormalizedJson(nextFrame));
+      setEditStatus("applied");
+      setValidationMessage("");
+      window.setTimeout(() => setEditStatus("idle"), 1600);
+    }
+    function resetJson() {
+      setJson(serializeNormalizedJson(frame));
+      setEditStatus("idle");
+      setValidationMessage("");
+    }
+    return /* @__PURE__ */ k("section", { class: "fixed inset-0 z-50 flex min-h-0 flex-col bg-[#111827] shadow-2xl" }, /* @__PURE__ */ k("header", { class: "flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-6" }, /* @__PURE__ */ k("div", null, /* @__PURE__ */ k("h3", { class: "text-xs font-bold uppercase tracking-wide text-gray-300" }, "JSON Editor"), /* @__PURE__ */ k("p", { class: "mt-0.5 text-[11px] text-gray-400" }, frame.children.length, " root children")), /* @__PURE__ */ k("div", { class: "flex items-center gap-2" }, validationMessage !== "" && /* @__PURE__ */ k("span", { class: "max-w-sm truncate text-xs font-semibold text-red-300", title: validationMessage }, validationMessage), editStatus === "applied" && /* @__PURE__ */ k("span", { class: "text-xs font-semibold text-[#5eead4]" }, "Applied"), /* @__PURE__ */ k(
+      "button",
+      {
+        type: "button",
+        onClick: resetJson,
+        class: "rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-gray-300 transition hover:bg-white/5"
+      },
+      "Reset"
+    ), /* @__PURE__ */ k(
+      "button",
+      {
+        type: "button",
+        onClick: applyJson,
+        class: "rounded-lg border border-[#5eead4]/40 bg-[#0f766e] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#0d9488]"
+      },
+      "Apply JSON"
+    ), /* @__PURE__ */ k(
       "button",
       {
         type: "button",
@@ -5842,10 +6025,42 @@ svg {
         class: "rounded-lg px-2 py-1 text-xs font-semibold text-[#5eead4] transition hover:bg-white/5"
       },
       "Collapse"
-    ))), /* @__PURE__ */ k(JsonPreviewPanel, { json }));
+    ))), /* @__PURE__ */ k(
+      JsonEditPanel,
+      {
+        json,
+        hasError: editStatus === "error",
+        onChange: (nextJson) => {
+          setJson(nextJson);
+          if (editStatus === "error") {
+            setEditStatus("idle");
+            setValidationMessage("");
+          }
+        }
+      }
+    ));
   }
-  function JsonPreviewPanel({ json }) {
-    return /* @__PURE__ */ k("section", { class: "flex min-h-0 flex-1 flex-col bg-[#111827]" }, /* @__PURE__ */ k("pre", { class: "min-h-0 flex-1 overflow-auto p-4 text-xs leading-5 text-gray-100" }, json));
+  function JsonEditPanel({
+    json,
+    hasError,
+    onChange
+  }) {
+    return /* @__PURE__ */ k("section", { class: "flex min-h-0 flex-1 flex-col bg-[#111827]" }, /* @__PURE__ */ k(
+      "textarea",
+      {
+        value: json,
+        spellcheck: false,
+        "aria-label": "Editable imported JSON",
+        onInput: (event) => onChange(event.currentTarget.value),
+        class: `min-h-0 flex-1 resize-none overflow-auto border-0 bg-[#111827] p-4 font-mono text-xs leading-5 text-gray-100 outline-none ${hasError ? "shadow-[inset_0_0_0_2px_rgba(248,113,113,0.75)]" : ""}`
+      }
+    ));
+  }
+  function formatValidationErrors2(errors) {
+    if (errors.length === 0) {
+      return "JSON must include a serialized frame.";
+    }
+    return `${errors[0].path}: ${errors[0].message}`;
   }
   async function copyText(value) {
     var _a;
@@ -6978,6 +7193,7 @@ svg {
       JsonViewerOverlay,
       {
         frame,
+        onFrameChange,
         onClose: () => setIsJsonViewerExpanded(false)
       }
     ));

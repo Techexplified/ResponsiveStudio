@@ -15,6 +15,7 @@ type JsonExportPayload = Extract<UiToPluginMessage, { type: "create-export-frame
 type JsonExportLayoutRules = JsonExportPayload["layoutRules"]
 type EffectiveJsonExportRules = Omit<ResponsiveNodeRule, "enabled">
 type EffectiveGenerationRules = Omit<ResponsiveNodeRule, "enabled">
+type SerializedLayoutMode = "NONE" | "HORIZONTAL" | "VERTICAL" | "GRID"
 type Bounds = {
   x: number
   y: number
@@ -140,7 +141,7 @@ async function getGenerationSourceNode(payload: GenerationPayload): Promise<Impo
 }
 
 async function createExportFrameFromJson(payload: JsonExportPayload) {
-  const materializedFrame = materializeExportPreviewFrame(payload)
+  const materializedFrame = materializeExactExportFrame(payload.frame)
   const exportFrame = await createSceneNodeFromSerializedNode(materializedFrame, true)
 
   if (!isImportableFrameNode(exportFrame)) {
@@ -155,6 +156,39 @@ async function createExportFrameFromJson(payload: JsonExportPayload) {
   figma.currentPage.selection = [exportFrame]
   figma.viewport.scrollAndZoomIntoView([exportFrame])
   figma.notify(`Created export frame "${exportFrame.name}" from JSON.`)
+}
+
+function materializeExactExportFrame(frame: FigmaSerializedFrame): FigmaSerializedFrame {
+  return {
+    ...withSerializedGeometry(
+      {
+        ...frame,
+        layout: getStaticSerializedLayout(frame),
+        children: frame.children.map((child) => materializeExactExportNode(child))
+      },
+      0,
+      0,
+      frame.geometry.width,
+      frame.geometry.height
+    ),
+    type: frame.type,
+    schemaVersion: 1,
+    importedAt: frame.importedAt
+  }
+}
+
+function materializeExactExportNode(node: FigmaSerializedNode): FigmaSerializedNode {
+  return withSerializedGeometry(
+    {
+      ...node,
+      layout: getStaticSerializedLayout(node),
+      children: node.children.map((child) => materializeExactExportNode(child))
+    },
+    node.geometry.x,
+    node.geometry.y,
+    node.geometry.width,
+    node.geometry.height
+  )
 }
 
 function materializeExportPreviewFrame(payload: JsonExportPayload): FigmaSerializedFrame {
@@ -848,11 +882,9 @@ async function applySerializedText(textNode: TextNode, node: FigmaSerializedNode
 
 function applySerializedLayout(sceneNode: SceneNode, node: FigmaSerializedNode) {
   if (hasAutoLayout(sceneNode)) {
-    const layoutMode = node.layout.layoutMode === "HORIZONTAL" || node.layout.layoutMode === "VERTICAL"
-      ? node.layout.layoutMode
-      : "NONE"
+    const layoutMode = getSerializedLayoutMode(node.layout.layoutMode)
 
-    sceneNode.layoutMode = layoutMode
+    setSerializedSceneLayoutMode(sceneNode, layoutMode)
 
     if (layoutMode !== "NONE") {
       sceneNode.itemSpacing = clampNumber(node.layout.itemSpacing ?? 0, 0, 1000)
@@ -887,6 +919,28 @@ function applySerializedLayout(sceneNode: SceneNode, node: FigmaSerializedNode) 
   if ("layoutSizingVertical" in sceneNode && isFigmaLayoutSizingMode(node.layout.layoutSizingVertical)) {
     sceneNode.layoutSizingVertical = node.layout.layoutSizingVertical
   }
+}
+
+function getSerializedLayoutMode(value: string | undefined): SerializedLayoutMode {
+  if (value === "HORIZONTAL" || value === "VERTICAL" || value === "GRID") {
+    return value
+  }
+
+  return "NONE"
+}
+
+function setSerializedSceneLayoutMode(sceneNode: SceneNode & AutoLayoutMixin, layoutMode: SerializedLayoutMode) {
+  if (layoutMode === "GRID") {
+    try {
+      ;(sceneNode as unknown as { layoutMode: SerializedLayoutMode }).layoutMode = layoutMode
+    } catch (_error) {
+      console.warn("This Figma runtime does not support GRID layout mode; created the node without Auto Layout grid.")
+      sceneNode.layoutMode = "NONE"
+    }
+    return
+  }
+
+  sceneNode.layoutMode = layoutMode
 }
 
 function getNextExportFrameX(width: number): number {

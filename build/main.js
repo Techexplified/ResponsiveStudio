@@ -155,7 +155,7 @@ async function getGenerationSourceNode(payload) {
   return selectedNode != null && isImportableFrameNode(selectedNode) ? selectedNode : null;
 }
 async function createExportFrameFromJson(payload) {
-  const materializedFrame = materializeExportPreviewFrame(payload);
+  const materializedFrame = materializeExactExportFrame(payload.frame);
   const exportFrame = await createSceneNodeFromSerializedNode(materializedFrame, true);
   if (!isImportableFrameNode(exportFrame)) {
     figma.notify("JSON export must resolve to a frame.");
@@ -169,355 +169,33 @@ async function createExportFrameFromJson(payload) {
   figma.viewport.scrollAndZoomIntoView([exportFrame]);
   figma.notify(`Created export frame "${exportFrame.name}" from JSON.`);
 }
-function materializeExportPreviewFrame(payload) {
-  const reviewWidth = Number.isFinite(payload.screenWidth) && payload.screenWidth > 0 ? payload.screenWidth : payload.frame.geometry.width;
-  const exportGroups = createJsonExportReviewGroups(payload.frame, reviewWidth, payload.layoutRules);
-  const reviewHeight = Math.max(
-    Math.min(payload.frame.geometry.height, 760),
-    exportGroups.reduce((bottom, group) => Math.max(bottom, group.y + group.height), 0) + 24
-  );
+function materializeExactExportFrame(frame) {
   return __spreadProps(__spreadValues({}, withSerializedGeometry(
-    __spreadProps(__spreadValues({}, payload.frame), {
-      layout: getStaticSerializedLayout(payload.frame),
-      children: exportGroups.map((group) => materializeJsonExportNode({
-        node: group.node,
-        origin: group.sourceBounds,
-        scale: group.scale,
-        layoutRules: payload.layoutRules,
-        reviewWidth,
-        x: group.x,
-        y: group.y,
-        width: group.width,
-        height: group.height
-      }))
+    __spreadProps(__spreadValues({}, frame), {
+      layout: getStaticSerializedLayout(frame),
+      children: frame.children.map((child) => materializeExactExportNode(child))
     }),
     0,
     0,
-    reviewWidth,
-    reviewHeight
+    frame.geometry.width,
+    frame.geometry.height
   )), {
-    type: payload.frame.type,
+    type: frame.type,
     schemaVersion: 1,
-    importedAt: payload.frame.importedAt
+    importedAt: frame.importedAt
   });
 }
-function createJsonExportReviewGroups(frame, reviewWidth, layoutRules) {
-  const outerPadding = layoutRules.outputPadding;
-  const contentWidth = Math.max(1, reviewWidth - outerPadding * 2);
-  const visibleChildren = frame.children.filter((child) => child.visible).sort((first, second) => first.geometry.y - second.geometry.y || first.geometry.x - second.geometry.x);
-  let nextY = outerPadding;
-  return visibleChildren.map((child) => {
-    const sourceBounds = child.geometry;
-    const scale = contentWidth / Math.max(sourceBounds.width, 1);
-    const height = Math.max(1, getJsonExportNodeHeight(child, layoutRules, reviewWidth) * scale);
-    const group = {
-      node: child,
-      x: outerPadding,
-      y: nextY,
-      width: contentWidth,
-      height,
-      sourceBounds,
-      scale
-    };
-    nextY += height + layoutRules.stackGap;
-    return group;
-  });
-}
-function materializeJsonExportNode({
-  node,
-  origin,
-  scale,
-  layoutRules,
-  reviewWidth,
-  x = (node.geometry.x - origin.x) * scale,
-  y = (node.geometry.y - origin.y) * scale,
-  width = node.geometry.width * scale,
-  height = getJsonExportNodeHeight(node, layoutRules, reviewWidth) * scale
-}) {
-  const arrangedChildren = arrangeJsonExportChildren(node, layoutRules, reviewWidth);
-  const text = node.text == null ? void 0 : __spreadProps(__spreadValues({}, node.text), {
-    fontSize: typeof node.text.fontSize === "number" ? getJsonExportFontSize(node.text.fontSize, scale, layoutRules) : node.text.fontSize,
-    lineHeight: scaleJsonExportLineHeight(node.text.lineHeight, scale)
-  });
-  const style = __spreadProps(__spreadValues({}, node.style), {
-    strokeWeight: typeof node.style.strokeWeight === "number" ? node.style.strokeWeight * scale : node.style.strokeWeight,
-    cornerRadius: typeof node.style.cornerRadius === "number" ? node.style.cornerRadius * scale : node.style.cornerRadius
-  });
+function materializeExactExportNode(node) {
   return withSerializedGeometry(
     __spreadProps(__spreadValues({}, node), {
       layout: getStaticSerializedLayout(node),
-      style,
-      text,
-      children: arrangedChildren.filter((child) => child.node.visible).map((child) => materializeJsonExportNode({
-        node: child.node,
-        origin: { x: 0, y: 0 },
-        scale,
-        layoutRules,
-        reviewWidth
-      }))
+      children: node.children.map((child) => materializeExactExportNode(child))
     }),
-    x,
-    y,
-    width,
-    height
+    node.geometry.x,
+    node.geometry.y,
+    node.geometry.width,
+    node.geometry.height
   );
-}
-function getJsonExportNodeHeight(node, layoutRules, reviewWidth) {
-  var _a;
-  if (node.children.length === 0) {
-    return node.geometry.height;
-  }
-  const arrangedChildren = arrangeJsonExportChildren(node, layoutRules, reviewWidth);
-  const childrenBottom = arrangedChildren.reduce((bottom, child) => {
-    return Math.max(
-      bottom,
-      child.node.geometry.y + getJsonExportNodeHeight(child.node, layoutRules, reviewWidth)
-    );
-  }, 0);
-  const padding = (_a = node.layout.padding) != null ? _a : {
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0
-  };
-  if (getJsonExportNodeAxisSizing(node, "vertical") === "HUG") {
-    return Math.max(1, childrenBottom + padding.bottom);
-  }
-  return Math.max(node.geometry.height, childrenBottom);
-}
-function arrangeJsonExportChildren(node, layoutRules, reviewWidth) {
-  const effectiveRules = getEffectiveJsonExportRules(node, layoutRules);
-  const convertedLayoutMode = getConvertedJsonExportLayoutMode(node, effectiveRules, reviewWidth);
-  const activeLayoutMode = convertedLayoutMode != null ? convertedLayoutMode : getNativeJsonExportLayoutMode(node);
-  const activeRules = convertedLayoutMode == null ? getNativeJsonExportLayoutRules(node, effectiveRules) : effectiveRules;
-  if (activeLayoutMode == null) {
-    return node.children.map((child) => ({ node: child }));
-  }
-  if (activeLayoutMode === "HORIZONTAL") {
-    return arrangeJsonExportChildrenHorizontally(node, layoutRules, activeRules, reviewWidth);
-  }
-  return arrangeJsonExportChildrenVertically(node, layoutRules, activeRules, reviewWidth);
-}
-function arrangeJsonExportChildrenVertically(node, layoutRules, effectiveRules, reviewWidth) {
-  var _a;
-  const padding = (_a = node.layout.padding) != null ? _a : {
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0
-  };
-  let nextY = padding.top;
-  const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right);
-  const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom);
-  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1);
-  const childLayouts = node.children.map((child) => {
-    const childWidth = shouldFillJsonExportAxis(
-      child,
-      "horizontal",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
-      "VERTICAL"
-    ) ? contentWidth : Math.min(child.geometry.width, contentWidth);
-    const childForWidth = withSerializedGeometry(
-      child,
-      child.geometry.x,
-      child.geometry.y,
-      childWidth,
-      child.geometry.height
-    );
-    return {
-      child,
-      childWidth,
-      baseHeight: getJsonExportNodeHeight(childForWidth, layoutRules, reviewWidth),
-      fillsHeight: shouldFillJsonExportAxis(child, "vertical", false, "VERTICAL")
-    };
-  });
-  const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length;
-  const fixedHeightTotal = childLayouts.reduce((total, child) => {
-    return child.fillsHeight ? total : total + child.baseHeight;
-  }, 0);
-  const fillHeight = fillHeightCount === 0 ? 0 : Math.max(1, (contentHeight - totalGap - fixedHeightTotal) / fillHeightCount);
-  return childLayouts.map((childLayout) => {
-    const child = childLayout.child;
-    const childWidth = childLayout.childWidth;
-    const childHeight = childLayout.fillsHeight ? fillHeight : childLayout.baseHeight;
-    const childX = getJsonExportStackedChildX(
-      effectiveRules.stackAlignment,
-      padding.left,
-      contentWidth,
-      childWidth
-    );
-    const nextChild = withSerializedGeometry(
-      child,
-      childX,
-      nextY,
-      childWidth,
-      childHeight
-    );
-    nextY += childHeight + effectiveRules.stackGap;
-    return {
-      node: nextChild
-    };
-  });
-}
-function arrangeJsonExportChildrenHorizontally(node, _layoutRules, effectiveRules, _reviewWidth) {
-  var _a;
-  const padding = (_a = node.layout.padding) != null ? _a : {
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0
-  };
-  let nextX = padding.left;
-  const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right);
-  const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom);
-  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1);
-  const childLayouts = node.children.map((child) => ({
-    child,
-    fillsWidth: shouldFillJsonExportAxis(child, "horizontal", false, "HORIZONTAL"),
-    childHeight: shouldFillJsonExportAxis(
-      child,
-      "vertical",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
-      "HORIZONTAL"
-    ) ? contentHeight : child.geometry.height
-  }));
-  const fillWidthCount = childLayouts.filter((child) => child.fillsWidth).length;
-  const fixedWidthTotal = childLayouts.reduce((total, child) => {
-    return child.fillsWidth ? total : total + child.child.geometry.width;
-  }, 0);
-  const fillChildWidth = fillWidthCount === 0 ? 0 : Math.max(1, (contentWidth - totalGap - fixedWidthTotal) / fillWidthCount);
-  return childLayouts.map((childLayout) => {
-    const child = childLayout.child;
-    const childWidth = childLayout.fillsWidth ? fillChildWidth : child.geometry.width;
-    const childHeight = childLayout.childHeight;
-    const childY = getJsonExportInlineChildY(
-      effectiveRules.stackAlignment,
-      padding.top,
-      contentHeight,
-      childHeight
-    );
-    const nextChild = withSerializedGeometry(
-      child,
-      nextX,
-      childY,
-      childWidth,
-      childHeight
-    );
-    nextX += childWidth + effectiveRules.stackGap;
-    return {
-      node: nextChild
-    };
-  });
-}
-function getConvertedJsonExportLayoutMode(node, layoutRules, reviewWidth) {
-  if (layoutRules.rowToColumnMode === "always") {
-    return getTargetJsonExportLayoutMode(node, layoutRules);
-  }
-  if (layoutRules.rowToColumnMode === "never") {
-    return null;
-  }
-  const shouldConvert = layoutRules.conversionDirection === "row-to-column" ? reviewWidth <= layoutRules.rowToColumnBreakpoint : reviewWidth >= layoutRules.rowToColumnBreakpoint;
-  return shouldConvert ? getTargetJsonExportLayoutMode(node, layoutRules) : null;
-}
-function getTargetJsonExportLayoutMode(node, layoutRules) {
-  if (layoutRules.conversionDirection === "row-to-column") {
-    return node.layout.layoutMode === "HORIZONTAL" ? "VERTICAL" : null;
-  }
-  return node.layout.layoutMode === "VERTICAL" ? "HORIZONTAL" : null;
-}
-function getNativeJsonExportLayoutMode(node) {
-  if (node.layout.layoutMode === "HORIZONTAL" || node.layout.layoutMode === "VERTICAL") {
-    return node.layout.layoutMode;
-  }
-  return null;
-}
-function getNativeJsonExportLayoutRules(node, fallbackRules) {
-  var _a;
-  return __spreadProps(__spreadValues({}, fallbackRules), {
-    stackGap: (_a = node.layout.itemSpacing) != null ? _a : fallbackRules.stackGap,
-    stackAlignment: getNativeJsonExportStackAlignment(node)
-  });
-}
-function getNativeJsonExportStackAlignment(node) {
-  if (node.layout.counterAxisAlignItems === "CENTER" || node.layout.counterAxisAlignItems === "BASELINE") {
-    return "center";
-  }
-  return "start";
-}
-function getEffectiveJsonExportRules(node, layoutRules) {
-  var _a;
-  const nodeRule = (_a = node.responsive) == null ? void 0 : _a.nodeRule;
-  if ((nodeRule == null ? void 0 : nodeRule.enabled) === true) {
-    return {
-      conversionDirection: nodeRule.conversionDirection,
-      rowToColumnMode: nodeRule.rowToColumnMode,
-      rowToColumnBreakpoint: nodeRule.rowToColumnBreakpoint,
-      stackGap: nodeRule.stackGap,
-      stackAlignment: nodeRule.stackAlignment
-    };
-  }
-  return {
-    conversionDirection: layoutRules.conversionDirection,
-    rowToColumnMode: layoutRules.rowToColumnMode,
-    rowToColumnBreakpoint: layoutRules.rowToColumnBreakpoint,
-    stackGap: layoutRules.stackGap,
-    stackAlignment: layoutRules.stackAlignment
-  };
-}
-function shouldFillJsonExportAxis(node, axis, defaultFill, parentLayoutMode = null) {
-  const sizingMode = getJsonExportNodeAxisSizing(node, axis, parentLayoutMode);
-  return sizingMode === "FILL" || sizingMode == null && defaultFill;
-}
-function getJsonExportNodeAxisSizing(node, axis, parentLayoutMode = null) {
-  const layoutSizing = axis === "horizontal" ? node.layout.layoutSizingHorizontal : node.layout.layoutSizingVertical;
-  if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
-    return layoutSizing;
-  }
-  const axisSizing = axisMatchesPrimaryAxis(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
-  if (axisSizing === "AUTO") {
-    return "HUG";
-  }
-  if (axisSizing === "FIXED") {
-    return "FIXED";
-  }
-  if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
-    return "FILL";
-  }
-  if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
-    return "FILL";
-  }
-  return null;
-}
-function getJsonExportFontSize(fontSize, scale, layoutRules) {
-  const scaledSize = fontSize * scale;
-  if (layoutRules.textScaleMode === "preserve") {
-    return Math.max(8, scaledSize);
-  }
-  if (layoutRules.textScaleMode === "scale") {
-    return Math.max(layoutRules.minimumTextSize, scaledSize);
-  }
-  return Math.max(layoutRules.minimumTextSize, Math.min(fontSize, scaledSize));
-}
-function scaleJsonExportLineHeight(lineHeight, scale) {
-  const lineHeightObject = asJsonObject(lineHeight);
-  if (lineHeightObject != null && lineHeightObject.unit === "PIXELS" && typeof lineHeightObject.value === "number") {
-    return __spreadProps(__spreadValues({}, lineHeightObject), {
-      value: lineHeightObject.value * scale
-    });
-  }
-  return lineHeight;
-}
-function getJsonExportStackedChildX(stackAlignment, paddingLeft, contentWidth, childWidth) {
-  if (stackAlignment === "center") {
-    return paddingLeft + Math.max(0, (contentWidth - childWidth) / 2);
-  }
-  return paddingLeft;
-}
-function getJsonExportInlineChildY(stackAlignment, paddingTop, contentHeight, childHeight) {
-  if (stackAlignment === "center") {
-    return paddingTop + Math.max(0, (contentHeight - childHeight) / 2);
-  }
-  return paddingTop;
 }
 function getStaticSerializedLayout(node) {
   return __spreadProps(__spreadValues({}, node.layout), {
@@ -644,8 +322,8 @@ async function applySerializedText(textNode, node) {
 function applySerializedLayout(sceneNode, node) {
   var _a;
   if (hasAutoLayout(sceneNode)) {
-    const layoutMode = node.layout.layoutMode === "HORIZONTAL" || node.layout.layoutMode === "VERTICAL" ? node.layout.layoutMode : "NONE";
-    sceneNode.layoutMode = layoutMode;
+    const layoutMode = getSerializedLayoutMode(node.layout.layoutMode);
+    setSerializedSceneLayoutMode(sceneNode, layoutMode);
     if (layoutMode !== "NONE") {
       sceneNode.itemSpacing = clampNumber((_a = node.layout.itemSpacing) != null ? _a : 0, 0, 1e3);
       sceneNode.primaryAxisAlignItems = toFigmaAxisAlign(node.layout.primaryAxisAlignItems);
@@ -673,6 +351,25 @@ function applySerializedLayout(sceneNode, node) {
   if ("layoutSizingVertical" in sceneNode && isFigmaLayoutSizingMode(node.layout.layoutSizingVertical)) {
     sceneNode.layoutSizingVertical = node.layout.layoutSizingVertical;
   }
+}
+function getSerializedLayoutMode(value) {
+  if (value === "HORIZONTAL" || value === "VERTICAL" || value === "GRID") {
+    return value;
+  }
+  return "NONE";
+}
+function setSerializedSceneLayoutMode(sceneNode, layoutMode) {
+  if (layoutMode === "GRID") {
+    try {
+      ;
+      sceneNode.layoutMode = layoutMode;
+    } catch (_error) {
+      console.warn("This Figma runtime does not support GRID layout mode; created the node without Auto Layout grid.");
+      sceneNode.layoutMode = "NONE";
+    }
+    return;
+  }
+  sceneNode.layoutMode = layoutMode;
 }
 function getNextExportFrameX(width) {
   const selectedNodes = figma.currentPage.selection;

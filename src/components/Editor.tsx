@@ -108,6 +108,7 @@ export default function Editor({
       {isJsonViewerExpanded && (
         <JsonViewerOverlay
           frame={frame}
+          onFrameChange={onFrameChange}
           onClose={() => setIsJsonViewerExpanded(false)}
         />
       )}

@@ -103,7 +103,7 @@ export type FigmaSerializedNodeV1 = {
   }
   layout: {
     isAutoLayout: boolean
-    autoLayoutDirection?: "NONE" | "HORIZONTAL" | "VERTICAL"
+    autoLayoutDirection?: "NONE" | "HORIZONTAL" | "VERTICAL" | "GRID"
     constraints?: FigmaJsonValue
     layoutMode?: string
     layoutAlign?: string
@@ -166,7 +166,7 @@ export type FigmaSerializedFrameV1 = FigmaSerializedNodeV1 & {
 export type FigmaSerializedNode = FigmaSerializedNodeV1
 export type FigmaSerializedFrame = FigmaSerializedFrameV1
 
-export type NormalizedLayoutMode = "NONE" | "HORIZONTAL" | "VERTICAL"
+export type NormalizedLayoutMode = "NONE" | "HORIZONTAL" | "VERTICAL" | "GRID"
 
 export type NormalizedNodeGeometry = {
   x: number
@@ -178,6 +178,7 @@ export type NormalizedNodeGeometry = {
 
 export type NormalizedNodeLayout = {
   isAutoLayout?: boolean
+  /** Omitted mode is the normalized representation of Figma layoutMode NONE. */
   mode?: NormalizedLayoutMode
   constraints?: FigmaJsonValue
   horizontalSizing?: string
@@ -185,14 +186,14 @@ export type NormalizedNodeLayout = {
   grow?: number
   align?: string
   gap?: number
-  counterAxisSpacing?: number
+  counterGap?: number
   primaryAlign?: string
   counterAlign?: string
   wrap?: boolean
   padding?: SerializedSpacing
   margin?: SerializedSpacing
-  primaryAxisSizingMode?: string
-  counterAxisSizingMode?: string
+  primarySizing?: string
+  counterSizing?: string
 }
 
 export type NormalizedNodeStyle = {
@@ -223,7 +224,7 @@ export type NormalizedFigmaNode = {
   metadata?: {
     [key: string]: FigmaJsonValue
   }
-  children: NormalizedFigmaNode[]
+  children?: NormalizedFigmaNode[]
 }
 
 export type NormalizedFigmaFrame = NormalizedFigmaNode & {

@@ -28,6 +28,10 @@ test("normalizes a desktop frame and removes derivable fields", () => {
   assert.equal(hasDerivedGeometryKeys(normalized.root), false)
   assert.equal(json.includes("layoutMode"), false)
   assert.equal(json.includes("autoLayoutDirection"), false)
+  assert.equal(json.includes("constraints"), false)
+  assert.equal(json.includes("counterAxisSpacing"), false)
+  assert.equal(json.includes("primaryAxisSizingMode"), false)
+  assert.equal(json.includes("counterAxisSizingMode"), false)
   assert.equal(json.includes("importedAt"), false)
 })
 
@@ -72,11 +76,22 @@ test("preserves text nodes and typography", () => {
 test("preserves fills and strokes", () => {
   const frame = createDesktopFrame()
   const normalizedCard = normalizeFigmaJson(frame).root.children[0]
+  const denormalizedCard = denormalizeFigmaJson(normalizeFigmaJson(frame)).children[0]
 
   assert.equal(Array.isArray(normalizedCard.style.fills), true)
   assert.equal(Array.isArray(normalizedCard.style.strokes), true)
+  assert.equal(normalizedCard.style.fills[0].visible, undefined)
+  assert.equal(normalizedCard.style.fills[0].opacity, undefined)
+  assert.equal(denormalizedCard.style.fills[0].visible, true)
+  assert.equal(denormalizedCard.style.fills[0].opacity, 1)
   assert.equal(normalizedCard.style.strokeWeight, 2)
   assert.equal(normalizedCard.style.cornerRadius, 12)
+})
+
+test("removes empty style objects", () => {
+  const normalizedColumn = normalizeFigmaJson(createDesktopFrame()).root.children[0].children[1]
+
+  assert.equal(normalizedColumn.style, undefined)
 })
 
 test("preserves hidden nodes", () => {
@@ -147,7 +162,7 @@ test("merges duplicate IDs in the same children array and warns", () => {
   }
 })
 
-test("keeps empty children arrays", () => {
+test("omits empty children arrays and restores them on read", () => {
   const frame = createMobileFrame()
 
   frame.children = []
@@ -155,8 +170,134 @@ test("keeps empty children arrays", () => {
   const normalized = normalizeFigmaJson(frame)
   const denormalized = denormalizeFigmaJson(normalized)
 
-  assert.deepEqual(normalized.root.children, [])
+  assert.equal(Object.hasOwn(normalized.root, "children"), false)
   assert.deepEqual(denormalized.children, [])
+})
+
+test("treats missing mode as NONE", () => {
+  const result = deserializeNormalizedJson({
+    schemaVersion: 2,
+    root: {
+      id: "119:0",
+      name: "Static frame",
+      type: "FRAME",
+      geometry: {
+        x: 0,
+        y: 0,
+        width: 320,
+        height: 240
+      }
+    }
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.value.root.layout.mode, "NONE")
+  assert.equal(denormalizeFigmaJson(result.value).layout.layoutMode, "NONE")
+})
+
+test("preserves GRID mode", () => {
+  const frame = createFrame({
+    id: "120:0",
+    name: "Grid frame",
+    width: 640,
+    height: 420,
+    layout: autoLayout("GRID", {
+      gap: 20,
+      horizontalSizing: "HUG",
+      verticalSizing: "FIXED"
+    }),
+    children: [
+      createNode({
+        id: "120:1",
+        name: "Grid child",
+        x: 0,
+        y: 0,
+        width: 120,
+        height: 80
+      })
+    ]
+  })
+  const normalized = normalizeFigmaJson(frame)
+  const denormalized = denormalizeFigmaJson(normalized)
+
+  assert.equal(normalized.root.layout.mode, "GRID")
+  assert.equal(denormalized.layout.layoutMode, "GRID")
+  assert.equal(denormalized.layout.autoLayoutDirection, "GRID")
+  assert.equal(denormalized.layout.layoutSizingHorizontal, "HUG")
+  assert.equal(denormalized.layout.primaryAxisSizingMode, "AUTO")
+})
+
+test("restores omitted sizing from node-specific defaults", () => {
+  const document = {
+    schemaVersion: 2,
+    root: {
+      id: "121:0",
+      name: "Vertical parent",
+      type: "FRAME",
+      geometry: {
+        x: 0,
+        y: 0,
+        width: 320,
+        height: 480
+      },
+      layout: {
+        mode: "VERTICAL"
+      },
+      children: [
+        {
+          id: "121:1",
+          name: "Stretch child",
+          type: "FRAME",
+          geometry: {
+            x: 0,
+            y: 0,
+            width: 300,
+            height: 120
+          },
+          layout: {
+            align: "STRETCH"
+          }
+        },
+        {
+          id: "121:2",
+          name: "Grow child",
+          type: "FRAME",
+          geometry: {
+            x: 0,
+            y: 128,
+            width: 300,
+            height: 120
+          },
+          layout: {
+            grow: 1
+          }
+        },
+        {
+          id: "121:3",
+          name: "Hug row",
+          type: "FRAME",
+          geometry: {
+            x: 0,
+            y: 256,
+            width: 300,
+            height: 120
+          },
+          layout: {
+            mode: "HORIZONTAL",
+            primarySizing: "AUTO"
+          }
+        }
+      ]
+    }
+  }
+  const denormalized = denormalizeFigmaJson(deserializeOk(document))
+
+  assert.equal(denormalized.children[0].layout.layoutSizingHorizontal, "FILL")
+  assert.equal(denormalized.children[0].layout.layoutSizingVertical, "FIXED")
+  assert.equal(denormalized.children[1].layout.layoutSizingHorizontal, "FIXED")
+  assert.equal(denormalized.children[1].layout.layoutSizingVertical, "FILL")
+  assert.equal(denormalized.children[2].layout.layoutSizingHorizontal, "HUG")
+  assert.equal(denormalized.children[2].layout.layoutSizingVertical, "FIXED")
 })
 
 test("migrates schemaVersion 1 immutably", () => {
@@ -494,10 +635,10 @@ function autoLayout(mode, options = {}) {
       bottom: 0,
       left: 0
     },
-    primaryAxisSizingMode: mode === "HORIZONTAL"
+    primaryAxisSizingMode: mode === "HORIZONTAL" || mode === "GRID"
       ? toAxisSizingMode(horizontalSizing)
       : toAxisSizingMode(verticalSizing),
-    counterAxisSizingMode: mode === "HORIZONTAL"
+    counterAxisSizingMode: mode === "HORIZONTAL" || mode === "GRID"
       ? toAxisSizingMode(verticalSizing)
       : toAxisSizingMode(horizontalSizing)
   }
@@ -616,7 +757,7 @@ function toRequiredRendererSnapshot(node) {
     style: {
       opacity: node.style.opacity,
       blendMode: node.style.blendMode,
-      fills: node.style.fills,
+      fills: nonEmptyArray(node.style.fills),
       strokes: nonEmptyArray(node.style.strokes),
       strokeWeight: node.style.strokeWeight,
       cornerRadius: node.style.cornerRadius,
@@ -651,7 +792,7 @@ function toVisibleLayoutSnapshot(node) {
     verticalSizing: node.layout.layoutSizingVertical,
     align: node.layout.layoutAlign,
     grow: node.layout.layoutGrow,
-    fills: node.style.fills,
+    fills: nonEmptyArray(node.style.fills),
     strokes: nonEmptyArray(node.style.strokes),
     opacity: node.style.opacity,
     cornerRadius: node.style.cornerRadius,
@@ -677,9 +818,17 @@ function hasDerivedGeometryKeys(node) {
     return true
   }
 
-  return node.children.some((child) => hasDerivedGeometryKeys(child))
+  return (node.children ?? []).some((child) => hasDerivedGeometryKeys(child))
 }
 
 function nonEmptyArray(value) {
   return Array.isArray(value) && value.length > 0 ? value : undefined
+}
+
+function deserializeOk(value) {
+  const result = deserializeNormalizedJson(value)
+
+  assert.equal(result.ok, true)
+
+  return result.value
 }

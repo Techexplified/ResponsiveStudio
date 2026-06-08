@@ -1,7 +1,7 @@
 import { h } from "preact"
-import { useState } from "preact/hooks"
+import { useEffect, useState } from "preact/hooks"
 import type { FigmaSerializedFrame } from "../frameSchema"
-import { serializeNormalizedJson } from "../normalizedFrameSchema"
+import { denormalizeFigmaJson, deserializeNormalizedJson, serializeNormalizedJson } from "../normalizedFrameSchema"
 
 type JsonViewerSliderProps = {
   frame: FigmaSerializedFrame
@@ -23,7 +23,7 @@ export function JsonViewerSlider({
       >
         <div>
           <h3 class="text-xs font-bold uppercase tracking-wide text-gray-300">
-            JSON Viewer
+            JSON Editor
           </h3>
           <p class="mt-0.5 text-[11px] text-gray-400">
             {frame.children.length} root children
@@ -31,7 +31,7 @@ export function JsonViewerSlider({
         </div>
 
         <span class="text-xs font-semibold text-[#5eead4]">
-          {isExpanded ? "Collapse" : "Expand"}
+          {isExpanded ? "Collapse" : "Edit JSON"}
         </span>
       </button>
     </section>
@@ -40,13 +40,23 @@ export function JsonViewerSlider({
 
 export function JsonViewerOverlay({
   frame,
+  onFrameChange,
   onClose
 }: {
   frame: FigmaSerializedFrame
+  onFrameChange: (frame: FigmaSerializedFrame) => void
   onClose: () => void
 }) {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle")
-  const json = serializeNormalizedJson(frame)
+  const [json, setJson] = useState(() => serializeNormalizedJson(frame))
+  const [editStatus, setEditStatus] = useState<"idle" | "applied" | "error">("idle")
+  const [validationMessage, setValidationMessage] = useState("")
+
+  useEffect(() => {
+    setJson(serializeNormalizedJson(frame))
+    setEditStatus("idle")
+    setValidationMessage("")
+  }, [frame])
 
   async function copyJson() {
     const didCopy = await copyText(json)
@@ -61,12 +71,36 @@ export function JsonViewerOverlay({
     window.setTimeout(() => setCopyStatus("idle"), 1600)
   }
 
+  function applyJson() {
+    const result = deserializeNormalizedJson(json)
+
+    if (!result.ok) {
+      setEditStatus("error")
+      setValidationMessage(formatValidationErrors(result.errors))
+      return
+    }
+
+    const nextFrame = denormalizeFigmaJson(result.value)
+
+    onFrameChange(nextFrame)
+    setJson(serializeNormalizedJson(nextFrame))
+    setEditStatus("applied")
+    setValidationMessage("")
+    window.setTimeout(() => setEditStatus("idle"), 1600)
+  }
+
+  function resetJson() {
+    setJson(serializeNormalizedJson(frame))
+    setEditStatus("idle")
+    setValidationMessage("")
+  }
+
   return (
     <section class="fixed inset-0 z-50 flex min-h-0 flex-col bg-[#111827] shadow-2xl">
       <header class="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-6">
         <div>
           <h3 class="text-xs font-bold uppercase tracking-wide text-gray-300">
-            JSON Viewer
+            JSON Editor
           </h3>
           <p class="mt-0.5 text-[11px] text-gray-400">
             {frame.children.length} root children
@@ -74,6 +108,34 @@ export function JsonViewerOverlay({
         </div>
 
         <div class="flex items-center gap-2">
+          {validationMessage !== "" && (
+            <span class="max-w-sm truncate text-xs font-semibold text-red-300" title={validationMessage}>
+              {validationMessage}
+            </span>
+          )}
+
+          {editStatus === "applied" && (
+            <span class="text-xs font-semibold text-[#5eead4]">
+              Applied
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={resetJson}
+            class="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-gray-300 transition hover:bg-white/5"
+          >
+            Reset
+          </button>
+
+          <button
+            type="button"
+            onClick={applyJson}
+            class="rounded-lg border border-[#5eead4]/40 bg-[#0f766e] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#0d9488]"
+          >
+            Apply JSON
+          </button>
+
           <button
             type="button"
             onClick={copyJson}
@@ -92,19 +154,51 @@ export function JsonViewerOverlay({
         </div>
       </header>
 
-      <JsonPreviewPanel json={json} />
+      <JsonEditPanel
+        json={json}
+        hasError={editStatus === "error"}
+        onChange={(nextJson) => {
+          setJson(nextJson)
+          if (editStatus === "error") {
+            setEditStatus("idle")
+            setValidationMessage("")
+          }
+        }}
+      />
     </section>
   )
 }
 
-function JsonPreviewPanel({ json }: { json: string }) {
+function JsonEditPanel({
+  json,
+  hasError,
+  onChange
+}: {
+  json: string
+  hasError: boolean
+  onChange: (json: string) => void
+}) {
   return (
     <section class="flex min-h-0 flex-1 flex-col bg-[#111827]">
-      <pre class="min-h-0 flex-1 overflow-auto p-4 text-xs leading-5 text-gray-100">
-        {json}
-      </pre>
+      <textarea
+        value={json}
+        spellcheck={false}
+        aria-label="Editable imported JSON"
+        onInput={(event) => onChange(event.currentTarget.value)}
+        class={`min-h-0 flex-1 resize-none overflow-auto border-0 bg-[#111827] p-4 font-mono text-xs leading-5 text-gray-100 outline-none ${
+          hasError ? "shadow-[inset_0_0_0_2px_rgba(248,113,113,0.75)]" : ""
+        }`}
+      />
     </section>
   )
+}
+
+function formatValidationErrors(errors: Array<{ path: string; message: string }>): string {
+  if (errors.length === 0) {
+    return "JSON must include a serialized frame."
+  }
+
+  return `${errors[0].path}: ${errors[0].message}`
 }
 
 async function copyText(value: string): Promise<boolean> {

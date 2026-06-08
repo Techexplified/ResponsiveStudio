@@ -32,6 +32,7 @@ type DenormalizeContext = {
   rootBounds: Bounds
   parentBounds: Bounds | null
   parentId: string | null
+  parentLayoutMode: NormalizedLayoutMode | null
   depth: number
   siblingIndex: number
   siblingCount: number
@@ -75,6 +76,7 @@ export function denormalizeFigmaJson(input: NormalizedFigmaDocument | Normalized
       rootBounds,
       parentBounds: null,
       parentId: null,
+      parentLayoutMode: null,
       depth: 0,
       siblingIndex: 0,
       siblingCount: 1,
@@ -295,13 +297,13 @@ function normalizeGeometry(geometry: FigmaSerializedNodeV1["geometry"]): Normali
 
 function normalizeLayout(layout: FigmaSerializedNodeV1["layout"]): NormalizedNodeLayout {
   const normalized: NormalizedNodeLayout = {}
-  const mode = readLayoutMode(layout.layoutMode ?? layout.autoLayoutDirection)
+  const mode = readLayoutMode(layout.layoutMode ?? layout.autoLayoutDirection) ?? "NONE"
 
-  if (mode != null && mode !== "NONE") {
+  if (mode !== "NONE") {
     normalized.mode = mode
   }
 
-  if (layout.constraints != null) {
+  if (layout.constraints != null && !isDefaultMinConstraints(layout.constraints)) {
     normalized.constraints = cloneJsonValue(layout.constraints)
   }
 
@@ -326,7 +328,7 @@ function normalizeLayout(layout: FigmaSerializedNodeV1["layout"]): NormalizedNod
   }
 
   if (typeof layout.counterAxisSpacing === "number" && layout.counterAxisSpacing !== 0) {
-    normalized.counterAxisSpacing = layout.counterAxisSpacing
+    normalized.counterGap = layout.counterAxisSpacing
   }
 
   if (layout.primaryAxisAlignItems != null && layout.primaryAxisAlignItems !== "MIN") {
@@ -349,7 +351,7 @@ function normalizeLayout(layout: FigmaSerializedNodeV1["layout"]): NormalizedNod
     normalized.margin = cloneSpacing(layout.margin)
   }
 
-  addAxisSizingIfNeeded(normalized, layout, mode ?? "NONE")
+  addAxisSizingIfNeeded(normalized, layout, mode)
 
   return normalized
 }
@@ -363,11 +365,11 @@ function addAxisSizingIfNeeded(
   const inferredCounter = inferCounterAxisSizing(layout, mode)
 
   if (layout.primaryAxisSizingMode != null && layout.primaryAxisSizingMode !== inferredPrimary) {
-    normalized.primaryAxisSizingMode = layout.primaryAxisSizingMode
+    normalized.primarySizing = layout.primaryAxisSizingMode
   }
 
   if (layout.counterAxisSizingMode != null && layout.counterAxisSizingMode !== inferredCounter) {
-    normalized.counterAxisSizingMode = layout.counterAxisSizingMode
+    normalized.counterSizing = layout.counterAxisSizingMode
   }
 }
 
@@ -382,12 +384,12 @@ function normalizeStyle(style: FigmaSerializedNodeV1["style"]): NormalizedNodeSt
     normalized.blendMode = style.blendMode
   }
 
-  if (style.fills != null) {
-    normalized.fills = cloneJsonValue(style.fills)
+  if (style.fills != null && !isEmptyJsonArray(style.fills)) {
+    normalized.fills = compactPaintArray(style.fills)
   }
 
   if (style.strokes != null && !isEmptyJsonArray(style.strokes)) {
-    normalized.strokes = cloneJsonValue(style.strokes)
+    normalized.strokes = compactPaintArray(style.strokes)
   }
 
   if (typeof style.strokeWeight === "number" && style.strokeWeight !== 1) {
@@ -538,13 +540,18 @@ function denormalizeNode(
     geometry.width,
     geometry.height
   )
-  const children = node.children.map((child, index) => denormalizeNode(child, {
+  const nodeChildren = getNodeChildren(node)
+  const layout = denormalizeLayout(node.layout, context.parentLayoutMode)
+  const children = nodeChildren.map((child, index) => denormalizeNode(child, {
     ...context,
     parentBounds: absoluteBounds,
     parentId: node.id,
+    parentLayoutMode: layout.layoutMode === "GRID" || layout.layoutMode === "HORIZONTAL" || layout.layoutMode === "VERTICAL"
+      ? layout.layoutMode
+      : null,
     depth: context.depth + 1,
     siblingIndex: index,
-    siblingCount: node.children.length
+    siblingCount: nodeChildren.length
   }))
 
   return {
@@ -575,7 +582,7 @@ function denormalizeNode(
         siblingCount: context.siblingCount
       }
     },
-    layout: denormalizeLayout(node.layout),
+    layout,
     style: denormalizeStyle(node, context.styles),
     text: node.text == null ? undefined : cloneJsonObject(node.text),
     component: node.component == null ? undefined : cloneJsonValue(node.component),
@@ -585,13 +592,18 @@ function denormalizeNode(
   }
 }
 
-function denormalizeLayout(layout: NormalizedNodeLayout | undefined): FigmaSerializedNodeV1["layout"] {
-  const mode = layout?.mode ?? "NONE"
-  const horizontalSizing = layout?.horizontalSizing ?? "FIXED"
-  const verticalSizing = layout?.verticalSizing ?? "FIXED"
+function denormalizeLayout(
+  layout: NormalizedNodeLayout | undefined,
+  parentLayoutMode: NormalizedLayoutMode | null
+): FigmaSerializedNodeV1["layout"] {
+  const mode = getStoredLayoutMode(layout)
+  const horizontalSizing = layout?.horizontalSizing ?? inferNodeAxisLayoutSizing(layout, mode, "horizontal", parentLayoutMode)
+  const verticalSizing = layout?.verticalSizing ?? inferNodeAxisLayoutSizing(layout, mode, "vertical", parentLayoutMode)
+  const primarySizing = layout?.primarySizing ?? inferPrimaryAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing)
+  const counterSizing = layout?.counterSizing ?? inferCounterAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing)
 
   return {
-    isAutoLayout: layout?.isAutoLayout ?? (mode === "HORIZONTAL" || mode === "VERTICAL"),
+    isAutoLayout: layout?.isAutoLayout ?? isLayoutModeActive(mode),
     autoLayoutDirection: mode,
     constraints: layout?.constraints == null ? undefined : cloneJsonValue(layout.constraints),
     layoutMode: mode,
@@ -600,14 +612,14 @@ function denormalizeLayout(layout: NormalizedNodeLayout | undefined): FigmaSeria
     layoutSizingHorizontal: horizontalSizing,
     layoutSizingVertical: verticalSizing,
     itemSpacing: layout?.gap ?? 0,
-    counterAxisSpacing: layout?.counterAxisSpacing,
+    counterAxisSpacing: layout?.counterGap,
     primaryAxisAlignItems: layout?.primaryAlign ?? "MIN",
     counterAxisAlignItems: layout?.counterAlign ?? "MIN",
     layoutWrap: layout?.wrap === true ? "WRAP" : "NO_WRAP",
     padding: layout?.padding == null ? cloneSpacing(defaultSpacing) : cloneSpacing(layout.padding),
     margin: layout?.margin,
-    primaryAxisSizingMode: layout?.primaryAxisSizingMode ?? inferPrimaryAxisSizingFromNormalized(layout),
-    counterAxisSizingMode: layout?.counterAxisSizingMode ?? inferCounterAxisSizingFromNormalized(layout)
+    primaryAxisSizingMode: primarySizing,
+    counterAxisSizingMode: counterSizing
   }
 }
 
@@ -624,8 +636,8 @@ function denormalizeStyle(
   return {
     opacity: style.opacity ?? 1,
     blendMode: style.blendMode ?? "PASS_THROUGH",
-    fills: style.fills == null ? undefined : cloneJsonValue(style.fills),
-    strokes: style.strokes == null ? undefined : cloneJsonValue(style.strokes),
+    fills: style.fills == null ? undefined : restorePaintArray(style.fills),
+    strokes: style.strokes == null ? undefined : restorePaintArray(style.strokes),
     strokeWeight: style.strokeWeight ?? 1,
     cornerRadius: style.cornerRadius ?? 0,
     effects: style.effects == null ? undefined : cloneJsonValue(style.effects)
@@ -648,8 +660,8 @@ function denormalizeResponsive(
     responsive.conversionRole = inferResponsiveConversionRole({
       type: node.type,
       responsive: node.responsive,
-      children: node.children,
-      layout: denormalizeLayout(node.layout),
+      children: getNodeChildren(node),
+      layout: denormalizeLayout(node.layout, null)
     })
   }
 
@@ -849,6 +861,10 @@ function readChildren(
   issues: ValidationIssue[],
   warnings: string[]
 ): NormalizedFigmaNode[] | null {
+  if (input == null) {
+    return []
+  }
+
   if (!Array.isArray(input)) {
     issues.push({
       path,
@@ -898,14 +914,14 @@ function readLayout(
   const grow = readOptionalNumber(record.grow, `${path}.grow`, issues)
   const align = readOptionalString(record.align, `${path}.align`, issues)
   const gap = readOptionalNumber(record.gap, `${path}.gap`, issues)
-  const counterAxisSpacing = readOptionalNumber(record.counterAxisSpacing, `${path}.counterAxisSpacing`, issues)
+  const counterGap = readOptionalNumber(record.counterGap ?? record.counterAxisSpacing, `${path}.counterGap`, issues)
   const primaryAlign = readOptionalString(record.primaryAlign, `${path}.primaryAlign`, issues)
   const counterAlign = readOptionalString(record.counterAlign, `${path}.counterAlign`, issues)
   const wrap = readOptionalBoolean(record.wrap, `${path}.wrap`, issues)
   const padding = readSpacing(record.padding, `${path}.padding`, issues)
   const margin = readSpacing(record.margin, `${path}.margin`, issues)
-  const primaryAxisSizingMode = readOptionalString(record.primaryAxisSizingMode, `${path}.primaryAxisSizingMode`, issues)
-  const counterAxisSizingMode = readOptionalString(record.counterAxisSizingMode, `${path}.counterAxisSizingMode`, issues)
+  const primarySizing = readOptionalString(record.primarySizing ?? record.primaryAxisSizingMode, `${path}.primarySizing`, issues)
+  const counterSizing = readOptionalString(record.counterSizing ?? record.counterAxisSizingMode, `${path}.counterSizing`, issues)
 
   if (mode != null) {
     layout.mode = mode
@@ -939,8 +955,8 @@ function readLayout(
     layout.gap = gap
   }
 
-  if (counterAxisSpacing != null) {
-    layout.counterAxisSpacing = counterAxisSpacing
+  if (counterGap != null) {
+    layout.counterGap = counterGap
   }
 
   if (primaryAlign != null) {
@@ -963,12 +979,12 @@ function readLayout(
     layout.margin = margin
   }
 
-  if (primaryAxisSizingMode != null) {
-    layout.primaryAxisSizingMode = primaryAxisSizingMode
+  if (primarySizing != null) {
+    layout.primarySizing = primarySizing
   }
 
-  if (counterAxisSizingMode != null) {
-    layout.counterAxisSizingMode = counterAxisSizingMode
+  if (counterSizing != null) {
+    layout.counterSizing = counterSizing
   }
 
   return layout
@@ -1316,16 +1332,24 @@ function restoreNormalizedDocumentDefaults(document: NormalizedFigmaDocument): N
   }
 }
 
-function restoreNormalizedNodeDefaults(node: NormalizedFigmaNode): NormalizedFigmaNode {
+function restoreNormalizedNodeDefaults(
+  node: NormalizedFigmaNode,
+  parentLayoutMode: NormalizedLayoutMode | null = null
+): NormalizedFigmaNode {
+  const layout = restoreLayoutDefaults(node.layout, parentLayoutMode)
+  const nextParentLayoutMode = isLayoutModeActive(layout.mode ?? "NONE")
+    ? layout.mode ?? "NONE"
+    : null
+
   return {
     ...node,
     visible: node.visible ?? true,
     locked: node.locked ?? false,
     geometry: restoreGeometryDefaults(node.geometry),
-    layout: restoreLayoutDefaults(node.layout),
+    layout,
     style: restoreStyleDefaults(node.style),
     text: node.text ?? null,
-    children: node.children.map((child) => restoreNormalizedNodeDefaults(child))
+    children: getNodeChildren(node).map((child) => restoreNormalizedNodeDefaults(child, nextParentLayoutMode))
   }
 }
 
@@ -1339,26 +1363,31 @@ function restoreGeometryDefaults(geometry: NormalizedFigmaNode["geometry"]): Req
   }
 }
 
-function restoreLayoutDefaults(layout: NormalizedNodeLayout | undefined): NormalizedNodeLayout {
-  const mode = layout?.mode ?? "NONE"
+function restoreLayoutDefaults(
+  layout: NormalizedNodeLayout | undefined,
+  parentLayoutMode: NormalizedLayoutMode | null
+): NormalizedNodeLayout {
+  const mode = getStoredLayoutMode(layout)
+  const horizontalSizing = layout?.horizontalSizing ?? inferNodeAxisLayoutSizing(layout, mode, "horizontal", parentLayoutMode)
+  const verticalSizing = layout?.verticalSizing ?? inferNodeAxisLayoutSizing(layout, mode, "vertical", parentLayoutMode)
 
   return {
-    isAutoLayout: layout?.isAutoLayout ?? (mode === "HORIZONTAL" || mode === "VERTICAL"),
+    isAutoLayout: layout?.isAutoLayout ?? isLayoutModeActive(mode),
     mode,
     constraints: layout?.constraints,
-    horizontalSizing: layout?.horizontalSizing ?? "FIXED",
-    verticalSizing: layout?.verticalSizing ?? "FIXED",
+    horizontalSizing,
+    verticalSizing,
     grow: layout?.grow ?? 0,
     align: layout?.align ?? "INHERIT",
     gap: layout?.gap ?? 0,
-    counterAxisSpacing: layout?.counterAxisSpacing,
+    counterGap: layout?.counterGap,
     primaryAlign: layout?.primaryAlign ?? "MIN",
     counterAlign: layout?.counterAlign ?? "MIN",
     wrap: layout?.wrap ?? false,
     padding: layout?.padding == null ? cloneSpacing(defaultSpacing) : cloneSpacing(layout.padding),
     margin: layout?.margin,
-    primaryAxisSizingMode: layout?.primaryAxisSizingMode ?? inferPrimaryAxisSizingFromNormalized(layout),
-    counterAxisSizingMode: layout?.counterAxisSizingMode ?? inferCounterAxisSizingFromNormalized(layout)
+    primarySizing: layout?.primarySizing ?? inferPrimaryAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing),
+    counterSizing: layout?.counterSizing ?? inferCounterAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing)
   }
 }
 
@@ -1390,12 +1419,12 @@ function compactNormalizedDocument(document: NormalizedFigmaDocument): Normalize
 }
 
 function compactNormalizedNode(node: NormalizedFigmaNode): NormalizedFigmaNode {
+  const children = getNodeChildren(node).map((child) => compactNormalizedNode(child))
   const compact: NormalizedFigmaNode = {
     id: node.id,
     name: node.name,
     type: node.type,
-    geometry: compactGeometry(node.geometry),
-    children: node.children.map((child) => compactNormalizedNode(child))
+    geometry: compactGeometry(node.geometry)
   }
   const layout = compactLayout(node.layout)
   const style = compactStyle(node.style)
@@ -1445,6 +1474,10 @@ function compactNormalizedNode(node: NormalizedFigmaNode): NormalizedFigmaNode {
     compact.metadata = cloneJsonObject(node.metadata)
   }
 
+  if (children.length > 0) {
+    compact.children = children
+  }
+
   return compact
 }
 
@@ -1474,7 +1507,7 @@ function compactLayout(layout: NormalizedNodeLayout | undefined): NormalizedNode
     compact.mode = layout.mode
   }
 
-  if (layout.constraints != null) {
+  if (layout.constraints != null && !isDefaultMinConstraints(layout.constraints)) {
     compact.constraints = cloneJsonValue(layout.constraints)
   }
 
@@ -1498,8 +1531,8 @@ function compactLayout(layout: NormalizedNodeLayout | undefined): NormalizedNode
     compact.gap = layout.gap
   }
 
-  if ((layout.counterAxisSpacing ?? 0) !== 0) {
-    compact.counterAxisSpacing = layout.counterAxisSpacing
+  if ((layout.counterGap ?? 0) !== 0) {
+    compact.counterGap = layout.counterGap
   }
 
   if (layout.primaryAlign != null && layout.primaryAlign !== "MIN") {
@@ -1522,15 +1555,18 @@ function compactLayout(layout: NormalizedNodeLayout | undefined): NormalizedNode
     compact.margin = cloneSpacing(layout.margin)
   }
 
-  const inferredPrimary = inferPrimaryAxisSizingFromNormalized(layout)
-  const inferredCounter = inferCounterAxisSizingFromNormalized(layout)
+  const mode = getStoredLayoutMode(layout)
+  const horizontalSizing = layout.horizontalSizing ?? inferNodeAxisLayoutSizing(layout, mode, "horizontal", null)
+  const verticalSizing = layout.verticalSizing ?? inferNodeAxisLayoutSizing(layout, mode, "vertical", null)
+  const inferredPrimary = inferPrimaryAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing)
+  const inferredCounter = inferCounterAxisSizingFromLayoutSizing(mode, horizontalSizing, verticalSizing)
 
-  if (layout.primaryAxisSizingMode != null && layout.primaryAxisSizingMode !== inferredPrimary) {
-    compact.primaryAxisSizingMode = layout.primaryAxisSizingMode
+  if (layout.primarySizing != null && layout.primarySizing !== inferredPrimary) {
+    compact.primarySizing = layout.primarySizing
   }
 
-  if (layout.counterAxisSizingMode != null && layout.counterAxisSizingMode !== inferredCounter) {
-    compact.counterAxisSizingMode = layout.counterAxisSizingMode
+  if (layout.counterSizing != null && layout.counterSizing !== inferredCounter) {
+    compact.counterSizing = layout.counterSizing
   }
 
   return isEmptyRecord(compact) ? undefined : compact
@@ -1551,12 +1587,12 @@ function compactStyle(style: NormalizedNodeStyle | undefined): NormalizedNodeSty
     compact.blendMode = style.blendMode
   }
 
-  if (style.fills != null) {
-    compact.fills = cloneJsonValue(style.fills)
+  if (style.fills != null && !isEmptyJsonArray(style.fills)) {
+    compact.fills = compactPaintArray(style.fills)
   }
 
   if (style.strokes != null && !isEmptyJsonArray(style.strokes)) {
-    compact.strokes = cloneJsonValue(style.strokes)
+    compact.strokes = compactPaintArray(style.strokes)
   }
 
   if ((style.strokeWeight ?? 1) !== 1) {
@@ -1598,40 +1634,118 @@ function inferPrimaryAxisSizing(
   layout: FigmaSerializedNodeV1["layout"],
   mode: NormalizedLayoutMode
 ): string {
-  const sizing = mode === "HORIZONTAL"
-    ? layout.layoutSizingHorizontal
-    : layout.layoutSizingVertical
-
-  return sizing === "HUG" ? "AUTO" : "FIXED"
+  return inferPrimaryAxisSizingFromLayoutSizing(
+    mode,
+    layout.layoutSizingHorizontal ?? "FIXED",
+    layout.layoutSizingVertical ?? "FIXED"
+  )
 }
 
 function inferCounterAxisSizing(
   layout: FigmaSerializedNodeV1["layout"],
   mode: NormalizedLayoutMode
 ): string {
-  const sizing = mode === "HORIZONTAL"
-    ? layout.layoutSizingVertical
-    : layout.layoutSizingHorizontal
+  return inferCounterAxisSizingFromLayoutSizing(
+    mode,
+    layout.layoutSizingHorizontal ?? "FIXED",
+    layout.layoutSizingVertical ?? "FIXED"
+  )
+}
+
+function inferNodeAxisLayoutSizing(
+  layout: NormalizedNodeLayout | undefined,
+  mode: NormalizedLayoutMode,
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: NormalizedLayoutMode | null
+): string {
+  const ownAxisSizing = axisMatchesPrimaryAxis(mode, axis)
+    ? layout?.primarySizing
+    : layout?.counterSizing
+
+  if (ownAxisSizing === "AUTO") {
+    return "HUG"
+  }
+
+  if (parentLayoutMode != null && layout?.align === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return "FILL"
+  }
+
+  if (parentLayoutMode != null && typeof layout?.grow === "number" && layout.grow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
+    return "FILL"
+  }
+
+  return "FIXED"
+}
+
+function inferPrimaryAxisSizingFromLayoutSizing(
+  mode: NormalizedLayoutMode,
+  horizontalSizing: string,
+  verticalSizing: string
+): string {
+  const sizing = mode === "HORIZONTAL" || mode === "GRID"
+    ? horizontalSizing
+    : verticalSizing
 
   return sizing === "HUG" ? "AUTO" : "FIXED"
 }
 
-function inferPrimaryAxisSizingFromNormalized(layout: NormalizedNodeLayout | undefined): string {
-  const mode = layout?.mode ?? "NONE"
-  const sizing = mode === "HORIZONTAL"
-    ? layout?.horizontalSizing
-    : layout?.verticalSizing
+function inferCounterAxisSizingFromLayoutSizing(
+  mode: NormalizedLayoutMode,
+  horizontalSizing: string,
+  verticalSizing: string
+): string {
+  const sizing = mode === "HORIZONTAL" || mode === "GRID"
+    ? verticalSizing
+    : horizontalSizing
 
   return sizing === "HUG" ? "AUTO" : "FIXED"
 }
 
-function inferCounterAxisSizingFromNormalized(layout: NormalizedNodeLayout | undefined): string {
-  const mode = layout?.mode ?? "NONE"
-  const sizing = mode === "HORIZONTAL"
-    ? layout?.verticalSizing
-    : layout?.horizontalSizing
+function getStoredLayoutMode(layout: NormalizedNodeLayout | undefined): NormalizedLayoutMode {
+  return layout?.mode ?? "NONE"
+}
 
-  return sizing === "HUG" ? "AUTO" : "FIXED"
+function isLayoutModeActive(mode: NormalizedLayoutMode): boolean {
+  return mode !== "NONE"
+}
+
+function axisMatchesPrimaryAxis(
+  mode: NormalizedLayoutMode,
+  axis: "horizontal" | "vertical"
+): boolean {
+  if (mode === "GRID") {
+    return axis === "horizontal"
+  }
+
+  return axis === "horizontal"
+    ? mode === "HORIZONTAL"
+    : mode === "VERTICAL"
+}
+
+function axisMatchesPrimaryParentAxis(
+  parentLayoutMode: NormalizedLayoutMode,
+  axis: "horizontal" | "vertical"
+): boolean {
+  if (parentLayoutMode === "GRID") {
+    return axis === "horizontal"
+  }
+
+  return axis === "horizontal"
+    ? parentLayoutMode === "HORIZONTAL"
+    : parentLayoutMode === "VERTICAL"
+}
+
+function axisMatchesCrossAxis(
+  parentLayoutMode: NormalizedLayoutMode,
+  axis: "horizontal" | "vertical"
+): boolean {
+  if (parentLayoutMode === "GRID") {
+    return axis === "vertical"
+  }
+
+  return axis === "horizontal"
+    ? parentLayoutMode === "VERTICAL"
+    : parentLayoutMode === "HORIZONTAL"
 }
 
 function inferResponsiveConversionRole(node: {
@@ -1653,11 +1767,11 @@ function inferAcceptsChildren(node: Pick<FigmaSerializedNodeV1, "children" | "ty
     node.type === "INSTANCE" ||
     node.type === "RESPONSIVE_GROUP" ||
     node.responsive?.isVirtualGroup === true ||
-    node.children.length > 0
+    getNodeChildren(node).length > 0
 }
 
 function readLayoutMode(value: unknown): NormalizedLayoutMode | null {
-  return value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL"
+  return value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL" || value === "GRID"
     ? value
     : null
 }
@@ -1671,13 +1785,13 @@ function readOptionalLayoutMode(
     return undefined
   }
 
-  if (value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL") {
+  if (value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL" || value === "GRID") {
     return value
   }
 
   issues.push({
     path,
-    message: "Expected NONE, HORIZONTAL, or VERTICAL."
+    message: "Expected NONE, HORIZONTAL, VERTICAL, or GRID."
   })
   return undefined
 }
@@ -1932,6 +2046,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null
 }
 
+function getNodeChildren<T>(node: { children?: T[] }): T[] {
+  return node.children ?? []
+}
+
 function cloneSpacing(spacing: SerializedSpacing): SerializedSpacing {
   return {
     top: spacing.top,
@@ -1953,12 +2071,91 @@ function isDefaultSpacing(spacing: SerializedSpacing): boolean {
   return spacing.top === 0 && spacing.right === 0 && spacing.bottom === 0 && spacing.left === 0
 }
 
+function isDefaultMinConstraints(value: FigmaJsonValue): boolean {
+  const constraints = asRecord(value)
+
+  return constraints != null &&
+    constraints.horizontal === "MIN" &&
+    constraints.vertical === "MIN" &&
+    Object.keys(constraints).every((key) => key === "horizontal" || key === "vertical")
+}
+
 function isEmptyRecord(value: object): boolean {
   return Object.keys(value).length === 0
 }
 
 function isEmptyJsonArray(value: FigmaJsonValue): boolean {
   return Array.isArray(value) && value.length === 0
+}
+
+function compactPaintArray(value: FigmaJsonValue): FigmaJsonValue {
+  if (!Array.isArray(value)) {
+    return cloneJsonValue(value)
+  }
+
+  return value.map((paint) => compactPaint(paint))
+}
+
+function compactPaint(value: FigmaJsonValue): FigmaJsonValue {
+  const paint = asRecord(value)
+
+  if (paint == null) {
+    return cloneJsonValue(value)
+  }
+
+  const compact: { [key: string]: FigmaJsonValue } = {}
+
+  for (const [key, entry] of Object.entries(paint)) {
+    if (key === "visible" && entry === true) {
+      continue
+    }
+
+    if (key === "opacity" && entry === 1) {
+      continue
+    }
+
+    if (isFigmaJsonValue(entry)) {
+      compact[key] = cloneJsonValue(entry)
+    }
+  }
+
+  return compact
+}
+
+function restorePaintArray(value: FigmaJsonValue): FigmaJsonValue {
+  if (!Array.isArray(value)) {
+    return cloneJsonValue(value)
+  }
+
+  return value.map((paint) => restorePaint(paint))
+}
+
+function restorePaint(value: FigmaJsonValue): FigmaJsonValue {
+  const paint = asRecord(value)
+
+  if (paint == null) {
+    return cloneJsonValue(value)
+  }
+
+  const restored: { [key: string]: FigmaJsonValue } = {}
+
+  for (const [key, entry] of Object.entries(paint)) {
+    if (isFigmaJsonValue(entry)) {
+      restored[key] = cloneJsonValue(entry)
+    }
+  }
+
+  if (typeof restored.type === "string") {
+    if (restored.visible == null) {
+      restored.visible = true
+    }
+
+    if (restored.opacity == null) {
+      restored.opacity = 1
+    }
+  }
+
+  return restored
 }
 
 function isMergeableObject(value: unknown): value is Record<string, unknown> {
