@@ -17,6 +17,7 @@
     "build": "npm run build:css && npm run build:js",
     "build:css": "npx @tailwindcss/cli --input ./src/input.css --output ./src/output.css",
     "build:js": "build-figma-plugin --typecheck --minify",
+    "test": "rm -rf .tmp/schema-tests && tsc --project tsconfig.tests.json && node --test test/*.test.cjs",
     "watch": "npm run build:css && concurrently npm:watch:css npm:watch:js",
     "watch:css": "npx @tailwindcss/cli --input ./src/input.css --output ./src/output.css --watch",
     "watch:js": "build-figma-plugin --typecheck --watch"

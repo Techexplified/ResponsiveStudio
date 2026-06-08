@@ -427,9 +427,9 @@
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/54106c50-4a54-4f0b-b229-3d386c2fc276/base.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/f6f1bafe-ecdc-497d-85f7-0aba5ad8c644/base.js
   var init_base = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/54106c50-4a54-4f0b-b229-3d386c2fc276/base.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/f6f1bafe-ecdc-497d-85f7-0aba5ad8c644/base.js"() {
       if (document.getElementById("0a792085d1") === null) {
         const element = document.createElement("style");
         element.id = "0a792085d1";
@@ -578,9 +578,9 @@ svg {
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/16a79b2b-6e1b-4567-9694-662e0ed8c248/output.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/836c3db9-f371-478d-b3f9-9c0199dceb5a/output.js
   var init_output = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/16a79b2b-6e1b-4567-9694-662e0ed8c248/output.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/836c3db9-f371-478d-b3f9-9c0199dceb5a/output.js"() {
       if (document.getElementById("db1a1ac058") === null) {
         const element = document.createElement("style");
         element.id = "db1a1ac058";
@@ -1166,6 +1166,12 @@ svg {
   }
   .shrink-0 {
     flex-shrink: 0 !important;
+  }
+  .flex-grow {
+    flex-grow: 1 !important;
+  }
+  .grow {
+    flex-grow: 1 !important;
   }
   .border-collapse {
     border-collapse: collapse !important;
@@ -2348,13 +2354,1454 @@ svg {
     }
   });
 
+  // src/normalizedFrameSchema.ts
+  function normalizeFigmaJson(input) {
+    const result = deserializeNormalizedJson(input);
+    if (!result.ok) {
+      throw new Error(formatValidationErrors(result.errors));
+    }
+    return compactNormalizedDocument(result.value);
+  }
+  function denormalizeFigmaJson(input) {
+    const document2 = isNormalizedDocumentShape(input) ? input : {
+      schemaVersion: 2,
+      root: input
+    };
+    const rootGeometry = restoreGeometryDefaults(document2.root.geometry);
+    const rootBounds = createBounds(
+      rootGeometry.x,
+      rootGeometry.y,
+      rootGeometry.width,
+      rootGeometry.height
+    );
+    return __spreadProps(__spreadValues({}, denormalizeNode(document2.root, {
+      rootBounds,
+      parentBounds: null,
+      parentId: null,
+      depth: 0,
+      siblingIndex: 0,
+      siblingCount: 1,
+      styles: document2.styles
+    })), {
+      type: document2.root.type,
+      schemaVersion: 1,
+      importedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  }
+  function validateNormalizedJson(input) {
+    const warnings = [];
+    const issues = [];
+    const document2 = readNormalizedDocument(input, "$", issues, warnings);
+    if (document2 == null || issues.length > 0) {
+      return {
+        ok: false,
+        errors: issues.length > 0 ? issues : [{
+          path: "$",
+          message: "JSON must be a normalized schemaVersion 2 document."
+        }],
+        warnings
+      };
+    }
+    return {
+      ok: true,
+      value: restoreNormalizedDocumentDefaults(document2),
+      warnings
+    };
+  }
+  function migrateV1ToV2(input) {
+    const warnings = [];
+    if (!isFigmaSerializedFrameV1(input)) {
+      return {
+        ok: false,
+        errors: [{
+          path: "$",
+          message: "Expected a schemaVersion 1 serialized frame."
+        }],
+        warnings
+      };
+    }
+    const document2 = normalizeSerializedFrame(input, {
+      warnings
+    });
+    return {
+      ok: true,
+      value: document2,
+      warnings
+    };
+  }
+  function serializeNormalizedJson(input) {
+    return JSON.stringify(normalizeFigmaJson(input), null, 2);
+  }
+  function deserializeNormalizedJson(input) {
+    const parsed = typeof input === "string" ? parseJson(input) : {
+      ok: true,
+      value: input
+    };
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        errors: [{
+          path: "$",
+          message: parsed.error
+        }],
+        warnings: []
+      };
+    }
+    const directNormalized = validateNormalizedJson(parsed.value);
+    if (directNormalized.ok) {
+      return directNormalized;
+    }
+    const directV1 = migrateV1ToV2(parsed.value);
+    if (directV1.ok) {
+      return directV1;
+    }
+    const wrapper = asRecord(parsed.value);
+    if (wrapper != null) {
+      const frameValue = wrapper.frame;
+      const rootValue = wrapper.root;
+      const frameNormalized = validateNormalizedJson(frameValue);
+      if (frameNormalized.ok) {
+        return frameNormalized;
+      }
+      const frameV1 = migrateV1ToV2(frameValue);
+      if (frameV1.ok) {
+        return frameV1;
+      }
+      if (wrapper.schemaVersion === 2 && rootValue != null) {
+        return validateNormalizedJson({
+          schemaVersion: 2,
+          root: rootValue
+        });
+      }
+    }
+    return {
+      ok: false,
+      errors: directNormalized.ok ? [] : directNormalized.errors,
+      warnings: directNormalized.warnings
+    };
+  }
+  function normalizeSerializedFrame(frame, context) {
+    const root = normalizeSerializedNode(frame, "$.root", true, context);
+    return {
+      schemaVersion: 2,
+      root: __spreadProps(__spreadValues({}, root), {
+        type: frame.type
+      })
+    };
+  }
+  function normalizeSerializedNode(node, path, isRoot, context) {
+    const normalized = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      geometry: normalizeGeometry(node.geometry),
+      children: normalizeChildren(node.children, `${path}.children`, context)
+    };
+    const layout = normalizeLayout(node.layout);
+    const style = normalizeStyle(node.style);
+    const responsive = normalizeResponsive(node, isRoot);
+    if (node.originalFigmaId != null) {
+      normalized.originalFigmaId = node.originalFigmaId;
+    }
+    if (node.visible === false) {
+      normalized.visible = false;
+    }
+    if (node.locked === true) {
+      normalized.locked = true;
+    }
+    if (!isEmptyRecord(layout)) {
+      normalized.layout = layout;
+    }
+    if (!isEmptyRecord(style)) {
+      normalized.style = style;
+    }
+    if (node.text != null) {
+      normalized.text = cloneJsonObject(node.text);
+    }
+    if (responsive != null) {
+      normalized.responsive = responsive;
+    }
+    if (node.component != null) {
+      normalized.component = cloneJsonValue(node.component);
+    }
+    if (node.instance != null) {
+      normalized.instance = cloneJsonValue(node.instance);
+    }
+    if (node.metadata != null) {
+      normalized.metadata = cloneJsonObject(node.metadata);
+    }
+    return normalized;
+  }
+  function normalizeGeometry(geometry) {
+    const normalized = {
+      x: roundLayoutNumber(geometry.x),
+      y: roundLayoutNumber(geometry.y),
+      width: roundLayoutNumber(geometry.width),
+      height: roundLayoutNumber(geometry.height)
+    };
+    if (geometry.rotation !== 0) {
+      normalized.rotation = roundLayoutNumber(geometry.rotation);
+    }
+    return normalized;
+  }
+  function normalizeLayout(layout) {
+    var _a;
+    const normalized = {};
+    const mode = readLayoutMode((_a = layout.layoutMode) != null ? _a : layout.autoLayoutDirection);
+    if (mode != null && mode !== "NONE") {
+      normalized.mode = mode;
+    }
+    if (layout.constraints != null) {
+      normalized.constraints = cloneJsonValue(layout.constraints);
+    }
+    if (layout.layoutSizingHorizontal != null && layout.layoutSizingHorizontal !== "FIXED") {
+      normalized.horizontalSizing = layout.layoutSizingHorizontal;
+    }
+    if (layout.layoutSizingVertical != null && layout.layoutSizingVertical !== "FIXED") {
+      normalized.verticalSizing = layout.layoutSizingVertical;
+    }
+    if (typeof layout.layoutGrow === "number" && layout.layoutGrow !== 0) {
+      normalized.grow = layout.layoutGrow;
+    }
+    if (layout.layoutAlign != null && layout.layoutAlign !== "INHERIT") {
+      normalized.align = layout.layoutAlign;
+    }
+    if (typeof layout.itemSpacing === "number" && layout.itemSpacing !== 0) {
+      normalized.gap = layout.itemSpacing;
+    }
+    if (typeof layout.counterAxisSpacing === "number" && layout.counterAxisSpacing !== 0) {
+      normalized.counterAxisSpacing = layout.counterAxisSpacing;
+    }
+    if (layout.primaryAxisAlignItems != null && layout.primaryAxisAlignItems !== "MIN") {
+      normalized.primaryAlign = layout.primaryAxisAlignItems;
+    }
+    if (layout.counterAxisAlignItems != null && layout.counterAxisAlignItems !== "MIN") {
+      normalized.counterAlign = layout.counterAxisAlignItems;
+    }
+    if (layout.layoutWrap === "WRAP") {
+      normalized.wrap = true;
+    }
+    if (layout.padding != null && !isDefaultSpacing(layout.padding)) {
+      normalized.padding = cloneSpacing(layout.padding);
+    }
+    if (layout.margin != null && !isDefaultSpacing(layout.margin)) {
+      normalized.margin = cloneSpacing(layout.margin);
+    }
+    addAxisSizingIfNeeded(normalized, layout, mode != null ? mode : "NONE");
+    return normalized;
+  }
+  function addAxisSizingIfNeeded(normalized, layout, mode) {
+    const inferredPrimary = inferPrimaryAxisSizing(layout, mode);
+    const inferredCounter = inferCounterAxisSizing(layout, mode);
+    if (layout.primaryAxisSizingMode != null && layout.primaryAxisSizingMode !== inferredPrimary) {
+      normalized.primaryAxisSizingMode = layout.primaryAxisSizingMode;
+    }
+    if (layout.counterAxisSizingMode != null && layout.counterAxisSizingMode !== inferredCounter) {
+      normalized.counterAxisSizingMode = layout.counterAxisSizingMode;
+    }
+  }
+  function normalizeStyle(style) {
+    const normalized = {};
+    if (typeof style.opacity === "number" && style.opacity !== 1) {
+      normalized.opacity = style.opacity;
+    }
+    if (style.blendMode != null && style.blendMode !== "PASS_THROUGH") {
+      normalized.blendMode = style.blendMode;
+    }
+    if (style.fills != null) {
+      normalized.fills = cloneJsonValue(style.fills);
+    }
+    if (style.strokes != null && !isEmptyJsonArray(style.strokes)) {
+      normalized.strokes = cloneJsonValue(style.strokes);
+    }
+    if (typeof style.strokeWeight === "number" && style.strokeWeight !== 1) {
+      normalized.strokeWeight = style.strokeWeight;
+    }
+    if (style.cornerRadius != null && style.cornerRadius !== 0) {
+      normalized.cornerRadius = style.cornerRadius;
+    }
+    if (style.effects != null && !isEmptyJsonArray(style.effects)) {
+      normalized.effects = cloneJsonValue(style.effects);
+    }
+    return normalized;
+  }
+  function normalizeResponsive(node, isRoot) {
+    const source = node.responsive;
+    if (source == null) {
+      return void 0;
+    }
+    const responsive = __spreadValues({}, source);
+    const inferredConversionRole = inferResponsiveConversionRole(node);
+    const inferredAcceptsChildren = inferAcceptsChildren(node);
+    if (isRoot && responsive.groupRole === "root") {
+      delete responsive.groupRole;
+    }
+    if (responsive.conversionRole === inferredConversionRole) {
+      delete responsive.conversionRole;
+    }
+    if (responsive.acceptsChildren === inferredAcceptsChildren) {
+      delete responsive.acceptsChildren;
+    }
+    return isEmptyRecord(responsive) ? void 0 : cloneJsonObject(responsive);
+  }
+  function normalizeChildren(children, path, context) {
+    const normalizedChildren = [];
+    const firstIndexesById = /* @__PURE__ */ new Map();
+    children.forEach((child, index) => {
+      const childPath = `${path}[${index}]`;
+      const normalizedChild = normalizeSerializedNode(child, childPath, false, context);
+      const existingIndex = firstIndexesById.get(normalizedChild.id);
+      if (existingIndex == null) {
+        firstIndexesById.set(normalizedChild.id, normalizedChildren.length);
+        normalizedChildren.push(normalizedChild);
+        return;
+      }
+      const warning = `Duplicate node id "${normalizedChild.id}" at ${childPath}; keeping first occurrence.`;
+      context.warnings.push(warning);
+      console.warn(warning);
+      normalizedChildren[existingIndex] = mergeDuplicateNode(
+        normalizedChildren[existingIndex],
+        normalizedChild,
+        `${path}[${existingIndex}]`,
+        context
+      );
+    });
+    return normalizedChildren;
+  }
+  function mergeDuplicateNode(first, later, path, context) {
+    return mergeRecordValues(first, later, path, context);
+  }
+  function mergeRecordValues(first, later, path, context) {
+    const merged = __spreadValues({}, first);
+    for (const [key, laterValue] of Object.entries(later)) {
+      const nextPath = `${path}.${key}`;
+      const firstValue = merged[key];
+      if (firstValue == null) {
+        merged[key] = laterValue;
+        continue;
+      }
+      if (valuesAreEqual(firstValue, laterValue)) {
+        continue;
+      }
+      if (isMergeableObject(firstValue) && isMergeableObject(laterValue)) {
+        merged[key] = mergeRecordValues(firstValue, laterValue, nextPath, context);
+        continue;
+      }
+      const warning = `Duplicate node id conflict at ${nextPath}; kept first value.`;
+      context.warnings.push(warning);
+      console.warn(warning);
+    }
+    return merged;
+  }
+  function denormalizeNode(node, context) {
+    var _a, _b;
+    const geometry = restoreGeometryDefaults(node.geometry);
+    const absoluteBounds = context.parentBounds == null ? createBounds(geometry.x, geometry.y, geometry.width, geometry.height) : createBounds(
+      context.parentBounds.x + geometry.x,
+      context.parentBounds.y + geometry.y,
+      geometry.width,
+      geometry.height
+    );
+    const parentRelativeBounds = context.parentBounds == null ? createBounds(0, 0, geometry.width, geometry.height) : createBounds(geometry.x, geometry.y, geometry.width, geometry.height);
+    const rootRelativeBounds = createBounds(
+      absoluteBounds.x - context.rootBounds.x,
+      absoluteBounds.y - context.rootBounds.y,
+      geometry.width,
+      geometry.height
+    );
+    const children = node.children.map((child, index) => denormalizeNode(child, __spreadProps(__spreadValues({}, context), {
+      parentBounds: absoluteBounds,
+      parentId: node.id,
+      depth: context.depth + 1,
+      siblingIndex: index,
+      siblingCount: node.children.length
+    })));
+    return {
+      id: node.id,
+      originalFigmaId: node.originalFigmaId,
+      name: node.name,
+      type: node.type,
+      responsive: denormalizeResponsive(node, context.depth === 0),
+      visible: (_a = node.visible) != null ? _a : true,
+      locked: (_b = node.locked) != null ? _b : false,
+      geometry: {
+        x: geometry.x,
+        y: geometry.y,
+        width: geometry.width,
+        height: geometry.height,
+        rotation: geometry.rotation,
+        absoluteBounds,
+        parentRelativeBounds,
+        rootRelativeBounds,
+        percentOfParent: context.parentBounds == null ? void 0 : getPercentBounds(parentRelativeBounds, context.parentBounds),
+        percentOfRoot: getPercentBounds(rootRelativeBounds, context.rootBounds),
+        hierarchy: {
+          parentId: context.parentId,
+          depth: context.depth,
+          siblingIndex: context.siblingIndex,
+          siblingCount: context.siblingCount
+        }
+      },
+      layout: denormalizeLayout(node.layout),
+      style: denormalizeStyle(node, context.styles),
+      text: node.text == null ? void 0 : cloneJsonObject(node.text),
+      component: node.component == null ? void 0 : cloneJsonValue(node.component),
+      instance: node.instance == null ? void 0 : cloneJsonValue(node.instance),
+      metadata: node.metadata == null ? void 0 : cloneJsonObject(node.metadata),
+      children
+    };
+  }
+  function denormalizeLayout(layout) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
+    const horizontalSizing = (_b = layout == null ? void 0 : layout.horizontalSizing) != null ? _b : "FIXED";
+    const verticalSizing = (_c = layout == null ? void 0 : layout.verticalSizing) != null ? _c : "FIXED";
+    return {
+      isAutoLayout: (_d = layout == null ? void 0 : layout.isAutoLayout) != null ? _d : mode === "HORIZONTAL" || mode === "VERTICAL",
+      autoLayoutDirection: mode,
+      constraints: (layout == null ? void 0 : layout.constraints) == null ? void 0 : cloneJsonValue(layout.constraints),
+      layoutMode: mode,
+      layoutAlign: (_e = layout == null ? void 0 : layout.align) != null ? _e : "INHERIT",
+      layoutGrow: (_f = layout == null ? void 0 : layout.grow) != null ? _f : 0,
+      layoutSizingHorizontal: horizontalSizing,
+      layoutSizingVertical: verticalSizing,
+      itemSpacing: (_g = layout == null ? void 0 : layout.gap) != null ? _g : 0,
+      counterAxisSpacing: layout == null ? void 0 : layout.counterAxisSpacing,
+      primaryAxisAlignItems: (_h = layout == null ? void 0 : layout.primaryAlign) != null ? _h : "MIN",
+      counterAxisAlignItems: (_i = layout == null ? void 0 : layout.counterAlign) != null ? _i : "MIN",
+      layoutWrap: (layout == null ? void 0 : layout.wrap) === true ? "WRAP" : "NO_WRAP",
+      padding: (layout == null ? void 0 : layout.padding) == null ? cloneSpacing(defaultSpacing) : cloneSpacing(layout.padding),
+      margin: layout == null ? void 0 : layout.margin,
+      primaryAxisSizingMode: (_j = layout == null ? void 0 : layout.primaryAxisSizingMode) != null ? _j : inferPrimaryAxisSizingFromNormalized(layout),
+      counterAxisSizingMode: (_k = layout == null ? void 0 : layout.counterAxisSizingMode) != null ? _k : inferCounterAxisSizingFromNormalized(layout)
+    };
+  }
+  function denormalizeStyle(node, styles) {
+    var _a, _b, _c, _d;
+    const styleFromRegistry = node.styleRef == null ? void 0 : styles == null ? void 0 : styles[node.styleRef];
+    const style = __spreadValues(__spreadValues({}, styleFromRegistry), node.style);
+    return {
+      opacity: (_a = style.opacity) != null ? _a : 1,
+      blendMode: (_b = style.blendMode) != null ? _b : "PASS_THROUGH",
+      fills: style.fills == null ? void 0 : cloneJsonValue(style.fills),
+      strokes: style.strokes == null ? void 0 : cloneJsonValue(style.strokes),
+      strokeWeight: (_c = style.strokeWeight) != null ? _c : 1,
+      cornerRadius: (_d = style.cornerRadius) != null ? _d : 0,
+      effects: style.effects == null ? void 0 : cloneJsonValue(style.effects)
+    };
+  }
+  function denormalizeResponsive(node, isRoot) {
+    const responsive = __spreadValues({}, node.responsive);
+    if (isRoot && responsive.groupRole == null) {
+      responsive.groupRole = "root";
+    }
+    if (responsive.conversionRole == null) {
+      responsive.conversionRole = inferResponsiveConversionRole({
+        type: node.type,
+        responsive: node.responsive,
+        children: node.children,
+        layout: denormalizeLayout(node.layout)
+      });
+    }
+    if (responsive.acceptsChildren == null) {
+      responsive.acceptsChildren = inferAcceptsChildren(node);
+    }
+    return responsive;
+  }
+  function readNormalizedDocument(input, path, issues, warnings) {
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected an object."
+      });
+      return null;
+    }
+    if (record.schemaVersion !== 2) {
+      issues.push({
+        path: `${path}.schemaVersion`,
+        message: "Expected schemaVersion 2."
+      });
+    }
+    const root = readNormalizedNode(record.root, `${path}.root`, issues, warnings, true);
+    const styles = readStyles(record.styles, `${path}.styles`, issues);
+    if (root == null) {
+      return null;
+    }
+    if (root.type !== "FRAME" && root.type !== "COMPONENT" && root.type !== "INSTANCE") {
+      issues.push({
+        path: `${path}.root.type`,
+        message: "Root node type must be FRAME, COMPONENT, or INSTANCE."
+      });
+    }
+    return styles == null ? {
+      schemaVersion: 2,
+      root
+    } : {
+      schemaVersion: 2,
+      root,
+      styles
+    };
+  }
+  function readNormalizedNode(input, path, issues, warnings, _isRoot = false) {
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected a node object."
+      });
+      return null;
+    }
+    const id = readRequiredString(record.id, `${path}.id`, issues);
+    const name = readRequiredString(record.name, `${path}.name`, issues);
+    const type = readRequiredString(record.type, `${path}.type`, issues);
+    const geometry = readGeometry(record.geometry, `${path}.geometry`, issues);
+    const children = readChildren(record.children, `${path}.children`, issues, warnings);
+    if (id == null || name == null || type == null || geometry == null || children == null) {
+      return null;
+    }
+    const node = {
+      id,
+      name,
+      type,
+      geometry,
+      children
+    };
+    const originalFigmaId = readOptionalString(record.originalFigmaId, `${path}.originalFigmaId`, issues);
+    const visible = readOptionalBoolean(record.visible, `${path}.visible`, issues);
+    const locked = readOptionalBoolean(record.locked, `${path}.locked`, issues);
+    const layout = readLayout(record.layout, `${path}.layout`, issues);
+    const style = readStyle(record.style, `${path}.style`, issues);
+    const styleRef = readOptionalString(record.styleRef, `${path}.styleRef`, issues);
+    const text = readText(record.text, `${path}.text`, issues);
+    const responsive = readResponsive(record.responsive, `${path}.responsive`, issues);
+    const component = readOptionalJsonValue(record.component, `${path}.component`, issues);
+    const instance = readOptionalJsonValue(record.instance, `${path}.instance`, issues);
+    const metadata = readMetadata(record.metadata, `${path}.metadata`, issues);
+    if (originalFigmaId != null) {
+      node.originalFigmaId = originalFigmaId;
+    }
+    if (visible != null) {
+      node.visible = visible;
+    }
+    if (locked != null) {
+      node.locked = locked;
+    }
+    if (layout != null) {
+      node.layout = layout;
+    }
+    if (style != null) {
+      node.style = style;
+    }
+    if (styleRef != null) {
+      node.styleRef = styleRef;
+    }
+    if (text !== missingValue) {
+      node.text = text;
+    }
+    if (responsive != null) {
+      node.responsive = responsive;
+    }
+    if (component != null) {
+      node.component = component;
+    }
+    if (instance != null) {
+      node.instance = instance;
+    }
+    if (metadata != null) {
+      node.metadata = metadata;
+    }
+    return node;
+  }
+  function readGeometry(input, path, issues) {
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected geometry object."
+      });
+      return null;
+    }
+    const x2 = readRequiredNumber(record.x, `${path}.x`, issues);
+    const y3 = readRequiredNumber(record.y, `${path}.y`, issues);
+    const width = readRequiredNumber(record.width, `${path}.width`, issues);
+    const height = readRequiredNumber(record.height, `${path}.height`, issues);
+    const rotation = readOptionalNumber(record.rotation, `${path}.rotation`, issues);
+    if (x2 == null || y3 == null || width == null || height == null) {
+      return null;
+    }
+    return rotation == null ? {
+      x: x2,
+      y: y3,
+      width,
+      height
+    } : {
+      x: x2,
+      y: y3,
+      width,
+      height,
+      rotation
+    };
+  }
+  function readChildren(input, path, issues, warnings) {
+    if (!Array.isArray(input)) {
+      issues.push({
+        path,
+        message: "Expected children array."
+      });
+      return null;
+    }
+    const children = [];
+    input.forEach((child, index) => {
+      const node = readNormalizedNode(child, `${path}[${index}]`, issues, warnings);
+      if (node != null) {
+        children.push(node);
+      }
+    });
+    return children;
+  }
+  function readLayout(input, path, issues) {
+    if (input == null) {
+      return void 0;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected layout object."
+      });
+      return void 0;
+    }
+    const layout = {};
+    const mode = readOptionalLayoutMode(record.mode, `${path}.mode`, issues);
+    const isAutoLayout = readOptionalBoolean(record.isAutoLayout, `${path}.isAutoLayout`, issues);
+    const constraints = readOptionalJsonValue(record.constraints, `${path}.constraints`, issues);
+    const horizontalSizing = readOptionalString(record.horizontalSizing, `${path}.horizontalSizing`, issues);
+    const verticalSizing = readOptionalString(record.verticalSizing, `${path}.verticalSizing`, issues);
+    const grow = readOptionalNumber(record.grow, `${path}.grow`, issues);
+    const align = readOptionalString(record.align, `${path}.align`, issues);
+    const gap = readOptionalNumber(record.gap, `${path}.gap`, issues);
+    const counterAxisSpacing = readOptionalNumber(record.counterAxisSpacing, `${path}.counterAxisSpacing`, issues);
+    const primaryAlign = readOptionalString(record.primaryAlign, `${path}.primaryAlign`, issues);
+    const counterAlign = readOptionalString(record.counterAlign, `${path}.counterAlign`, issues);
+    const wrap = readOptionalBoolean(record.wrap, `${path}.wrap`, issues);
+    const padding = readSpacing(record.padding, `${path}.padding`, issues);
+    const margin = readSpacing(record.margin, `${path}.margin`, issues);
+    const primaryAxisSizingMode = readOptionalString(record.primaryAxisSizingMode, `${path}.primaryAxisSizingMode`, issues);
+    const counterAxisSizingMode = readOptionalString(record.counterAxisSizingMode, `${path}.counterAxisSizingMode`, issues);
+    if (mode != null) {
+      layout.mode = mode;
+    }
+    if (isAutoLayout != null) {
+      layout.isAutoLayout = isAutoLayout;
+    }
+    if (constraints != null) {
+      layout.constraints = constraints;
+    }
+    if (horizontalSizing != null) {
+      layout.horizontalSizing = horizontalSizing;
+    }
+    if (verticalSizing != null) {
+      layout.verticalSizing = verticalSizing;
+    }
+    if (grow != null) {
+      layout.grow = grow;
+    }
+    if (align != null) {
+      layout.align = align;
+    }
+    if (gap != null) {
+      layout.gap = gap;
+    }
+    if (counterAxisSpacing != null) {
+      layout.counterAxisSpacing = counterAxisSpacing;
+    }
+    if (primaryAlign != null) {
+      layout.primaryAlign = primaryAlign;
+    }
+    if (counterAlign != null) {
+      layout.counterAlign = counterAlign;
+    }
+    if (wrap != null) {
+      layout.wrap = wrap;
+    }
+    if (padding != null) {
+      layout.padding = padding;
+    }
+    if (margin != null) {
+      layout.margin = margin;
+    }
+    if (primaryAxisSizingMode != null) {
+      layout.primaryAxisSizingMode = primaryAxisSizingMode;
+    }
+    if (counterAxisSizingMode != null) {
+      layout.counterAxisSizingMode = counterAxisSizingMode;
+    }
+    return layout;
+  }
+  function readStyle(input, path, issues) {
+    if (input == null) {
+      return void 0;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected style object."
+      });
+      return void 0;
+    }
+    const style = {};
+    const opacity = readOptionalNumber(record.opacity, `${path}.opacity`, issues);
+    const blendMode = readOptionalString(record.blendMode, `${path}.blendMode`, issues);
+    const fills = readOptionalJsonValue(record.fills, `${path}.fills`, issues);
+    const strokes = readOptionalJsonValue(record.strokes, `${path}.strokes`, issues);
+    const strokeWeight = readOptionalNumber(record.strokeWeight, `${path}.strokeWeight`, issues);
+    const cornerRadius = readOptionalNumberOrString(record.cornerRadius, `${path}.cornerRadius`, issues);
+    const effects = readOptionalJsonValue(record.effects, `${path}.effects`, issues);
+    if (opacity != null) {
+      style.opacity = opacity;
+    }
+    if (blendMode != null) {
+      style.blendMode = blendMode;
+    }
+    if (fills != null) {
+      style.fills = fills;
+    }
+    if (strokes != null) {
+      style.strokes = strokes;
+    }
+    if (strokeWeight != null) {
+      style.strokeWeight = strokeWeight;
+    }
+    if (cornerRadius != null) {
+      style.cornerRadius = cornerRadius;
+    }
+    if (effects != null) {
+      style.effects = effects;
+    }
+    return style;
+  }
+  function readText(input, path, issues) {
+    if (input === void 0) {
+      return missingValue;
+    }
+    if (input === null) {
+      return null;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected text object or null."
+      });
+      return missingValue;
+    }
+    const characters = readRequiredString(record.characters, `${path}.characters`, issues);
+    const fontSize = readOptionalNumberOrString(record.fontSize, `${path}.fontSize`, issues);
+    const fontName = readOptionalJsonValue(record.fontName, `${path}.fontName`, issues);
+    const fontWeight = readOptionalNumber(record.fontWeight, `${path}.fontWeight`, issues);
+    const textAlignHorizontal = readOptionalString(record.textAlignHorizontal, `${path}.textAlignHorizontal`, issues);
+    const textAlignVertical = readOptionalString(record.textAlignVertical, `${path}.textAlignVertical`, issues);
+    const lineHeight = readOptionalJsonValue(record.lineHeight, `${path}.lineHeight`, issues);
+    const letterSpacing = readOptionalJsonValue(record.letterSpacing, `${path}.letterSpacing`, issues);
+    if (characters == null) {
+      return missingValue;
+    }
+    return {
+      characters,
+      fontSize,
+      fontName,
+      fontWeight,
+      textAlignHorizontal,
+      textAlignVertical,
+      lineHeight,
+      letterSpacing
+    };
+  }
+  function readResponsive(input, path, issues) {
+    if (input == null) {
+      return void 0;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected responsive object."
+      });
+      return void 0;
+    }
+    const responsive = {};
+    const isVirtualGroup2 = readOptionalBoolean(record.isVirtualGroup, `${path}.isVirtualGroup`, issues);
+    const groupRole = readOptionalResponsiveGroupRole(record.groupRole, `${path}.groupRole`, issues);
+    const conversionRole = readOptionalResponsiveConversionRole(record.conversionRole, `${path}.conversionRole`, issues);
+    const acceptsChildren = readOptionalBoolean(record.acceptsChildren, `${path}.acceptsChildren`, issues);
+    const createdByUser = readOptionalBoolean(record.createdByUser, `${path}.createdByUser`, issues);
+    const nodeRule = readResponsiveNodeRule(record.nodeRule, `${path}.nodeRule`, issues);
+    if (isVirtualGroup2 != null) {
+      responsive.isVirtualGroup = isVirtualGroup2;
+    }
+    if (groupRole != null) {
+      responsive.groupRole = groupRole;
+    }
+    if (conversionRole != null) {
+      responsive.conversionRole = conversionRole;
+    }
+    if (acceptsChildren != null) {
+      responsive.acceptsChildren = acceptsChildren;
+    }
+    if (createdByUser != null) {
+      responsive.createdByUser = createdByUser;
+    }
+    if (nodeRule != null) {
+      responsive.nodeRule = nodeRule;
+    }
+    return responsive;
+  }
+  function readResponsiveNodeRule(input, path, issues) {
+    if (input == null) {
+      return void 0;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected responsive node rule object."
+      });
+      return void 0;
+    }
+    const enabled = readRequiredBoolean(record.enabled, `${path}.enabled`, issues);
+    const conversionDirection = record.conversionDirection === "column-to-row" ? "column-to-row" : record.conversionDirection === "row-to-column" ? "row-to-column" : null;
+    const rowToColumnMode = record.rowToColumnMode === "always" || record.rowToColumnMode === "never" || record.rowToColumnMode === "auto" ? record.rowToColumnMode : null;
+    const rowToColumnBreakpoint = readRequiredNumber(record.rowToColumnBreakpoint, `${path}.rowToColumnBreakpoint`, issues);
+    const stackGap = readRequiredNumber(record.stackGap, `${path}.stackGap`, issues);
+    const stackAlignment = record.stackAlignment === "center" || record.stackAlignment === "stretch" || record.stackAlignment === "start" ? record.stackAlignment : null;
+    if (conversionDirection == null) {
+      issues.push({
+        path: `${path}.conversionDirection`,
+        message: "Expected row-to-column or column-to-row."
+      });
+    }
+    if (rowToColumnMode == null) {
+      issues.push({
+        path: `${path}.rowToColumnMode`,
+        message: "Expected auto, always, or never."
+      });
+    }
+    if (stackAlignment == null) {
+      issues.push({
+        path: `${path}.stackAlignment`,
+        message: "Expected start, center, or stretch."
+      });
+    }
+    if (enabled == null || conversionDirection == null || rowToColumnMode == null || rowToColumnBreakpoint == null || stackGap == null || stackAlignment == null) {
+      return void 0;
+    }
+    return {
+      enabled,
+      conversionDirection,
+      rowToColumnMode,
+      rowToColumnBreakpoint,
+      stackGap,
+      stackAlignment
+    };
+  }
+  function readStyles(input, path, issues) {
+    var _a;
+    if (input == null) {
+      return void 0;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected styles object."
+      });
+      return void 0;
+    }
+    const styles = {};
+    for (const [key, value] of Object.entries(record)) {
+      styles[key] = (_a = readStyle(value, `${path}.${key}`, issues)) != null ? _a : {};
+    }
+    return styles;
+  }
+  function readSpacing(input, path, issues) {
+    if (input == null) {
+      return void 0;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected spacing object."
+      });
+      return void 0;
+    }
+    const top = readRequiredNumber(record.top, `${path}.top`, issues);
+    const right = readRequiredNumber(record.right, `${path}.right`, issues);
+    const bottom = readRequiredNumber(record.bottom, `${path}.bottom`, issues);
+    const left = readRequiredNumber(record.left, `${path}.left`, issues);
+    if (top == null || right == null || bottom == null || left == null) {
+      return void 0;
+    }
+    return {
+      top,
+      right,
+      bottom,
+      left
+    };
+  }
+  function readMetadata(input, path, issues) {
+    if (input == null) {
+      return void 0;
+    }
+    const record = asRecord(input);
+    if (record == null) {
+      issues.push({
+        path,
+        message: "Expected metadata object."
+      });
+      return void 0;
+    }
+    const metadata = {};
+    for (const [key, value] of Object.entries(record)) {
+      if (isFigmaJsonValue(value)) {
+        metadata[key] = cloneJsonValue(value);
+        continue;
+      }
+      issues.push({
+        path: `${path}.${key}`,
+        message: "Expected JSON-compatible metadata value."
+      });
+    }
+    return metadata;
+  }
+  function restoreNormalizedDocumentDefaults(document2) {
+    return __spreadProps(__spreadValues({}, document2), {
+      root: restoreNormalizedNodeDefaults(document2.root)
+    });
+  }
+  function restoreNormalizedNodeDefaults(node) {
+    var _a, _b, _c;
+    return __spreadProps(__spreadValues({}, node), {
+      visible: (_a = node.visible) != null ? _a : true,
+      locked: (_b = node.locked) != null ? _b : false,
+      geometry: restoreGeometryDefaults(node.geometry),
+      layout: restoreLayoutDefaults(node.layout),
+      style: restoreStyleDefaults(node.style),
+      text: (_c = node.text) != null ? _c : null,
+      children: node.children.map((child) => restoreNormalizedNodeDefaults(child))
+    });
+  }
+  function restoreGeometryDefaults(geometry) {
+    var _a;
+    return {
+      x: geometry.x,
+      y: geometry.y,
+      width: geometry.width,
+      height: geometry.height,
+      rotation: (_a = geometry.rotation) != null ? _a : 0
+    };
+  }
+  function restoreLayoutDefaults(layout) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
+    return {
+      isAutoLayout: (_b = layout == null ? void 0 : layout.isAutoLayout) != null ? _b : mode === "HORIZONTAL" || mode === "VERTICAL",
+      mode,
+      constraints: layout == null ? void 0 : layout.constraints,
+      horizontalSizing: (_c = layout == null ? void 0 : layout.horizontalSizing) != null ? _c : "FIXED",
+      verticalSizing: (_d = layout == null ? void 0 : layout.verticalSizing) != null ? _d : "FIXED",
+      grow: (_e = layout == null ? void 0 : layout.grow) != null ? _e : 0,
+      align: (_f = layout == null ? void 0 : layout.align) != null ? _f : "INHERIT",
+      gap: (_g = layout == null ? void 0 : layout.gap) != null ? _g : 0,
+      counterAxisSpacing: layout == null ? void 0 : layout.counterAxisSpacing,
+      primaryAlign: (_h = layout == null ? void 0 : layout.primaryAlign) != null ? _h : "MIN",
+      counterAlign: (_i = layout == null ? void 0 : layout.counterAlign) != null ? _i : "MIN",
+      wrap: (_j = layout == null ? void 0 : layout.wrap) != null ? _j : false,
+      padding: (layout == null ? void 0 : layout.padding) == null ? cloneSpacing(defaultSpacing) : cloneSpacing(layout.padding),
+      margin: layout == null ? void 0 : layout.margin,
+      primaryAxisSizingMode: (_k = layout == null ? void 0 : layout.primaryAxisSizingMode) != null ? _k : inferPrimaryAxisSizingFromNormalized(layout),
+      counterAxisSizingMode: (_l = layout == null ? void 0 : layout.counterAxisSizingMode) != null ? _l : inferCounterAxisSizingFromNormalized(layout)
+    };
+  }
+  function restoreStyleDefaults(style) {
+    var _a, _b, _c, _d;
+    return {
+      opacity: (_a = style == null ? void 0 : style.opacity) != null ? _a : 1,
+      blendMode: (_b = style == null ? void 0 : style.blendMode) != null ? _b : "PASS_THROUGH",
+      fills: style == null ? void 0 : style.fills,
+      strokes: style == null ? void 0 : style.strokes,
+      strokeWeight: (_c = style == null ? void 0 : style.strokeWeight) != null ? _c : 1,
+      cornerRadius: (_d = style == null ? void 0 : style.cornerRadius) != null ? _d : 0,
+      effects: style == null ? void 0 : style.effects
+    };
+  }
+  function compactNormalizedDocument(document2) {
+    const compactRoot = compactNormalizedNode(document2.root);
+    return document2.styles == null ? {
+      schemaVersion: 2,
+      root: compactRoot
+    } : {
+      schemaVersion: 2,
+      styles: compactStyles(document2.styles),
+      root: compactRoot
+    };
+  }
+  function compactNormalizedNode(node) {
+    const compact = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      geometry: compactGeometry(node.geometry),
+      children: node.children.map((child) => compactNormalizedNode(child))
+    };
+    const layout = compactLayout(node.layout);
+    const style = compactStyle(node.style);
+    const responsive = compactResponsive(node.responsive);
+    if (node.originalFigmaId != null) {
+      compact.originalFigmaId = node.originalFigmaId;
+    }
+    if (node.visible === false) {
+      compact.visible = false;
+    }
+    if (node.locked === true) {
+      compact.locked = true;
+    }
+    if (layout != null) {
+      compact.layout = layout;
+    }
+    if (style != null) {
+      compact.style = style;
+    }
+    if (node.styleRef != null) {
+      compact.styleRef = node.styleRef;
+    }
+    if (node.text != null) {
+      compact.text = cloneJsonObject(node.text);
+    }
+    if (responsive != null) {
+      compact.responsive = responsive;
+    }
+    if (node.component != null) {
+      compact.component = cloneJsonValue(node.component);
+    }
+    if (node.instance != null) {
+      compact.instance = cloneJsonValue(node.instance);
+    }
+    if (node.metadata != null) {
+      compact.metadata = cloneJsonObject(node.metadata);
+    }
+    return compact;
+  }
+  function compactGeometry(geometry) {
+    var _a, _b;
+    const compact = {
+      x: roundLayoutNumber(geometry.x),
+      y: roundLayoutNumber(geometry.y),
+      width: roundLayoutNumber(geometry.width),
+      height: roundLayoutNumber(geometry.height)
+    };
+    if (((_a = geometry.rotation) != null ? _a : 0) !== 0) {
+      compact.rotation = roundLayoutNumber((_b = geometry.rotation) != null ? _b : 0);
+    }
+    return compact;
+  }
+  function compactLayout(layout) {
+    var _a, _b, _c;
+    if (layout == null) {
+      return void 0;
+    }
+    const compact = {};
+    if (layout.mode != null && layout.mode !== "NONE") {
+      compact.mode = layout.mode;
+    }
+    if (layout.constraints != null) {
+      compact.constraints = cloneJsonValue(layout.constraints);
+    }
+    if (layout.horizontalSizing != null && layout.horizontalSizing !== "FIXED") {
+      compact.horizontalSizing = layout.horizontalSizing;
+    }
+    if (layout.verticalSizing != null && layout.verticalSizing !== "FIXED") {
+      compact.verticalSizing = layout.verticalSizing;
+    }
+    if (((_a = layout.grow) != null ? _a : 0) !== 0) {
+      compact.grow = layout.grow;
+    }
+    if (layout.align != null && layout.align !== "INHERIT") {
+      compact.align = layout.align;
+    }
+    if (((_b = layout.gap) != null ? _b : 0) !== 0) {
+      compact.gap = layout.gap;
+    }
+    if (((_c = layout.counterAxisSpacing) != null ? _c : 0) !== 0) {
+      compact.counterAxisSpacing = layout.counterAxisSpacing;
+    }
+    if (layout.primaryAlign != null && layout.primaryAlign !== "MIN") {
+      compact.primaryAlign = layout.primaryAlign;
+    }
+    if (layout.counterAlign != null && layout.counterAlign !== "MIN") {
+      compact.counterAlign = layout.counterAlign;
+    }
+    if (layout.wrap === true) {
+      compact.wrap = true;
+    }
+    if (layout.padding != null && !isDefaultSpacing(layout.padding)) {
+      compact.padding = cloneSpacing(layout.padding);
+    }
+    if (layout.margin != null && !isDefaultSpacing(layout.margin)) {
+      compact.margin = cloneSpacing(layout.margin);
+    }
+    const inferredPrimary = inferPrimaryAxisSizingFromNormalized(layout);
+    const inferredCounter = inferCounterAxisSizingFromNormalized(layout);
+    if (layout.primaryAxisSizingMode != null && layout.primaryAxisSizingMode !== inferredPrimary) {
+      compact.primaryAxisSizingMode = layout.primaryAxisSizingMode;
+    }
+    if (layout.counterAxisSizingMode != null && layout.counterAxisSizingMode !== inferredCounter) {
+      compact.counterAxisSizingMode = layout.counterAxisSizingMode;
+    }
+    return isEmptyRecord(compact) ? void 0 : compact;
+  }
+  function compactStyle(style) {
+    var _a, _b;
+    if (style == null) {
+      return void 0;
+    }
+    const compact = {};
+    if (((_a = style.opacity) != null ? _a : 1) !== 1) {
+      compact.opacity = style.opacity;
+    }
+    if (style.blendMode != null && style.blendMode !== "PASS_THROUGH") {
+      compact.blendMode = style.blendMode;
+    }
+    if (style.fills != null) {
+      compact.fills = cloneJsonValue(style.fills);
+    }
+    if (style.strokes != null && !isEmptyJsonArray(style.strokes)) {
+      compact.strokes = cloneJsonValue(style.strokes);
+    }
+    if (((_b = style.strokeWeight) != null ? _b : 1) !== 1) {
+      compact.strokeWeight = style.strokeWeight;
+    }
+    if (style.cornerRadius != null && style.cornerRadius !== 0) {
+      compact.cornerRadius = style.cornerRadius;
+    }
+    if (style.effects != null && !isEmptyJsonArray(style.effects)) {
+      compact.effects = cloneJsonValue(style.effects);
+    }
+    return isEmptyRecord(compact) ? void 0 : compact;
+  }
+  function compactStyles(styles) {
+    var _a;
+    const compacted = {};
+    for (const [key, style] of Object.entries(styles)) {
+      compacted[key] = (_a = compactStyle(style)) != null ? _a : {};
+    }
+    return compacted;
+  }
+  function compactResponsive(responsive) {
+    if (responsive == null || isEmptyRecord(responsive)) {
+      return void 0;
+    }
+    return cloneJsonObject(responsive);
+  }
+  function inferPrimaryAxisSizing(layout, mode) {
+    const sizing = mode === "HORIZONTAL" ? layout.layoutSizingHorizontal : layout.layoutSizingVertical;
+    return sizing === "HUG" ? "AUTO" : "FIXED";
+  }
+  function inferCounterAxisSizing(layout, mode) {
+    const sizing = mode === "HORIZONTAL" ? layout.layoutSizingVertical : layout.layoutSizingHorizontal;
+    return sizing === "HUG" ? "AUTO" : "FIXED";
+  }
+  function inferPrimaryAxisSizingFromNormalized(layout) {
+    var _a;
+    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
+    const sizing = mode === "HORIZONTAL" ? layout == null ? void 0 : layout.horizontalSizing : layout == null ? void 0 : layout.verticalSizing;
+    return sizing === "HUG" ? "AUTO" : "FIXED";
+  }
+  function inferCounterAxisSizingFromNormalized(layout) {
+    var _a;
+    const mode = (_a = layout == null ? void 0 : layout.mode) != null ? _a : "NONE";
+    const sizing = mode === "HORIZONTAL" ? layout == null ? void 0 : layout.verticalSizing : layout == null ? void 0 : layout.horizontalSizing;
+    return sizing === "HUG" ? "AUTO" : "FIXED";
+  }
+  function inferResponsiveConversionRole(node) {
+    var _a;
+    if (((_a = node.responsive) == null ? void 0 : _a.isVirtualGroup) === true || node.type === "RESPONSIVE_GROUP") {
+      return "responsive-group";
+    }
+    return node.layout.isAutoLayout ? "auto-layout-container" : "manual-layer";
+  }
+  function inferAcceptsChildren(node) {
+    var _a;
+    return node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE" || node.type === "RESPONSIVE_GROUP" || ((_a = node.responsive) == null ? void 0 : _a.isVirtualGroup) === true || node.children.length > 0;
+  }
+  function readLayoutMode(value) {
+    return value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL" ? value : null;
+  }
+  function readOptionalLayoutMode(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (value === "NONE" || value === "HORIZONTAL" || value === "VERTICAL") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected NONE, HORIZONTAL, or VERTICAL."
+    });
+    return void 0;
+  }
+  function readOptionalResponsiveGroupRole(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (value === "root" || value === "group") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected root or group."
+    });
+    return void 0;
+  }
+  function readOptionalResponsiveConversionRole(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (value === "auto-layout-container" || value === "manual-layer" || value === "responsive-group") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected auto-layout-container, manual-layer, or responsive-group."
+    });
+    return void 0;
+  }
+  function readRequiredString(value, path, issues) {
+    if (typeof value === "string") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected string."
+    });
+    return null;
+  }
+  function readOptionalString(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected string."
+    });
+    return void 0;
+  }
+  function readRequiredNumber(value, path, issues) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected finite number."
+    });
+    return null;
+  }
+  function readOptionalNumber(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected finite number."
+    });
+    return void 0;
+  }
+  function readOptionalNumberOrString(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (typeof value === "number" && Number.isFinite(value) || typeof value === "string") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected finite number or string."
+    });
+    return void 0;
+  }
+  function readRequiredBoolean(value, path, issues) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected boolean."
+    });
+    return null;
+  }
+  function readOptionalBoolean(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (typeof value === "boolean") {
+      return value;
+    }
+    issues.push({
+      path,
+      message: "Expected boolean."
+    });
+    return void 0;
+  }
+  function readOptionalJsonValue(value, path, issues) {
+    if (value == null) {
+      return void 0;
+    }
+    if (isFigmaJsonValue(value)) {
+      return cloneJsonValue(value);
+    }
+    issues.push({
+      path,
+      message: "Expected JSON-compatible value."
+    });
+    return void 0;
+  }
+  function isFigmaSerializedFrameV1(value) {
+    const record = asRecord(value);
+    return record != null && record.schemaVersion === 1 && typeof record.importedAt === "string" && (record.type === "FRAME" || record.type === "COMPONENT" || record.type === "INSTANCE") && isFigmaSerializedNodeV1(record);
+  }
+  function isFigmaSerializedNodeV1(value) {
+    const record = asRecord(value);
+    const geometry = asRecord(record == null ? void 0 : record.geometry);
+    return record != null && typeof record.id === "string" && typeof record.name === "string" && typeof record.type === "string" && typeof record.visible === "boolean" && typeof record.locked === "boolean" && geometry != null && typeof geometry.x === "number" && typeof geometry.y === "number" && typeof geometry.width === "number" && typeof geometry.height === "number" && asRecord(record.layout) != null && asRecord(record.style) != null && Array.isArray(record.children) && record.children.every((child) => isFigmaSerializedNodeV1(child));
+  }
+  function isNormalizedDocumentShape(value) {
+    const record = asRecord(value);
+    return (record == null ? void 0 : record.schemaVersion) === 2 && record.root != null;
+  }
+  function isFigmaJsonValue(value) {
+    if (value == null || typeof value === "string" || typeof value === "number" && Number.isFinite(value) || typeof value === "boolean") {
+      return true;
+    }
+    if (Array.isArray(value)) {
+      return value.every((entry) => isFigmaJsonValue(entry));
+    }
+    const record = asRecord(value);
+    return record != null && Object.values(record).every((entry) => isFigmaJsonValue(entry));
+  }
+  function asRecord(value) {
+    return value != null && typeof value === "object" && !Array.isArray(value) ? value : null;
+  }
+  function cloneSpacing(spacing) {
+    return {
+      top: spacing.top,
+      right: spacing.right,
+      bottom: spacing.bottom,
+      left: spacing.left
+    };
+  }
+  function cloneJsonValue(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+  function cloneJsonObject(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+  function isDefaultSpacing(spacing) {
+    return spacing.top === 0 && spacing.right === 0 && spacing.bottom === 0 && spacing.left === 0;
+  }
+  function isEmptyRecord(value) {
+    return Object.keys(value).length === 0;
+  }
+  function isEmptyJsonArray(value) {
+    return Array.isArray(value) && value.length === 0;
+  }
+  function isMergeableObject(value) {
+    return asRecord(value) != null;
+  }
+  function valuesAreEqual(first, second) {
+    return JSON.stringify(first) === JSON.stringify(second);
+  }
+  function parseJson(value) {
+    try {
+      return {
+        ok: true,
+        value: JSON.parse(value)
+      };
+    } catch (_error) {
+      return {
+        ok: false,
+        error: "Paste valid JSON."
+      };
+    }
+  }
+  function formatValidationErrors(errors) {
+    if (errors.length === 0) {
+      return "Invalid normalized JSON.";
+    }
+    return errors.map((error) => `${error.path}: ${error.message}`).join("\n");
+  }
+  function createBounds(x2, y3, width, height) {
+    const roundedX = roundLayoutNumber(x2);
+    const roundedY = roundLayoutNumber(y3);
+    const roundedWidth = roundLayoutNumber(width);
+    const roundedHeight = roundLayoutNumber(height);
+    return {
+      x: roundedX,
+      y: roundedY,
+      width: roundedWidth,
+      height: roundedHeight,
+      right: roundLayoutNumber(roundedX + roundedWidth),
+      bottom: roundLayoutNumber(roundedY + roundedHeight),
+      centerX: roundLayoutNumber(roundedX + roundedWidth / 2),
+      centerY: roundLayoutNumber(roundedY + roundedHeight / 2)
+    };
+  }
+  function getPercentBounds(bounds, container) {
+    return {
+      x: toPercent(bounds.x, container.width),
+      y: toPercent(bounds.y, container.height),
+      width: toPercent(bounds.width, container.width),
+      height: toPercent(bounds.height, container.height),
+      right: toPercent(bounds.right, container.width),
+      bottom: toPercent(bounds.bottom, container.height)
+    };
+  }
+  function toPercent(value, total) {
+    return total === 0 ? 0 : roundLayoutNumber(value / total * 100);
+  }
+  function roundLayoutNumber(value) {
+    return Math.round(value * 1e3) / 1e3;
+  }
+  var defaultSpacing, missingValue;
+  var init_normalizedFrameSchema = __esm({
+    "src/normalizedFrameSchema.ts"() {
+      "use strict";
+      defaultSpacing = {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0
+      };
+      missingValue = Symbol("missing");
+    }
+  });
+
   // src/components/ExportFramePanel.tsx
   function ExportFramePanel({
     snapshot,
     isOpen,
     onClose
   }) {
+    const normalizedFrame = snapshot == null ? null : normalizeFigmaJson(snapshot.frame);
     const exportPayload = snapshot == null ? null : {
+      schemaVersion: 2,
       exportType: "responsive-frame-plan",
       appliedAt: snapshot.appliedAt,
       target: {
@@ -2365,7 +3812,7 @@ svg {
         importedWidth: snapshot.settings.sourceWidth
       },
       appliedOptions: snapshot.settings.options.filter((option) => option.enabled),
-      frame: snapshot.frame
+      root: normalizedFrame == null ? void 0 : normalizedFrame.root
     };
     return /* @__PURE__ */ k(
       "aside",
@@ -2404,6 +3851,7 @@ svg {
     "src/components/ExportFramePanel.tsx"() {
       "use strict";
       init_preact_module();
+      init_normalizedFrameSchema();
     }
   });
 
@@ -4367,7 +5815,7 @@ svg {
     onClose
   }) {
     const [copyStatus, setCopyStatus] = d2("idle");
-    const json = JSON.stringify(frame, null, 2);
+    const json = serializeNormalizedJson(frame);
     async function copyJson() {
       const didCopy = await copyText(json);
       if (didCopy) {
@@ -4430,6 +5878,7 @@ svg {
       "use strict";
       init_preact_module();
       init_hooks_module();
+      init_normalizedFrameSchema();
     }
   });
 
@@ -5788,23 +7237,23 @@ svg {
         error: "Paste valid JSON."
       };
     }
-    const root = asRecord(parsed);
+    const root = asRecord2(parsed);
     if (root == null) {
       return {
         error: "JSON must be an object."
       };
     }
-    const frameCandidate = isFigmaSerializedFrame(parsed) ? parsed : isFigmaSerializedFrame(root.frame) ? root.frame : null;
-    if (frameCandidate == null) {
+    const frameResult = deserializeNormalizedJson(parsed);
+    if (!frameResult.ok) {
       return {
-        error: "JSON must include a serialized frame."
+        error: frameResult.errors.length === 0 ? "JSON must include a serialized frame." : `JSON frame is invalid: ${frameResult.errors[0].path} ${frameResult.errors[0].message}`
       };
     }
-    const settings = asRecord(root.settings);
-    const target = asRecord(root.target);
-    const source = asRecord(root.source);
+    const settings = asRecord2(root.settings);
+    const target = asRecord2(root.target);
+    const source = asRecord2(root.source);
     return {
-      frame: cloneFrame(frameCandidate),
+      frame: denormalizeFigmaJson(frameResult.value),
       appliedAt: readString(root.appliedAt),
       targetDevice: readTargetDevice((_a = settings == null ? void 0 : settings.targetDevice) != null ? _a : target == null ? void 0 : target.device),
       sourceWidth: readPositiveNumber((_b = settings == null ? void 0 : settings.sourceWidth) != null ? _b : source == null ? void 0 : source.importedWidth),
@@ -5834,15 +7283,6 @@ svg {
       "*"
     );
   }
-  function isFigmaSerializedFrame(value) {
-    const record = asRecord(value);
-    return record != null && (record.type === "FRAME" || record.type === "COMPONENT" || record.type === "INSTANCE") && record.schemaVersion === 1 && typeof record.importedAt === "string" && isFigmaSerializedNode(record);
-  }
-  function isFigmaSerializedNode(value) {
-    const record = asRecord(value);
-    const geometry = asRecord(record == null ? void 0 : record.geometry);
-    return record != null && typeof record.id === "string" && typeof record.name === "string" && typeof record.type === "string" && typeof record.visible === "boolean" && typeof record.locked === "boolean" && geometry != null && typeof geometry.width === "number" && typeof geometry.height === "number" && asRecord(record.layout) != null && asRecord(record.style) != null && Array.isArray(record.children) && record.children.every((child) => isFigmaSerializedNode(child));
-  }
   function readTargetDevice(value) {
     if (value === "mobile" || value === "tablet" || value === "desktop" || value === "custom") {
       return value;
@@ -5850,7 +7290,7 @@ svg {
     return void 0;
   }
   function readLayoutRules(value) {
-    const record = asRecord(value);
+    const record = asRecord2(value);
     if (record == null) {
       return void 0;
     }
@@ -5871,7 +7311,7 @@ svg {
       return void 0;
     }
     const options = value.flatMap((option) => {
-      const record = asRecord(option);
+      const record = asRecord2(option);
       if (record == null || typeof record.id !== "string" || typeof record.label !== "string" || typeof record.description !== "string") {
         return [];
       }
@@ -5911,7 +7351,7 @@ svg {
   function readString(value) {
     return typeof value === "string" ? value : void 0;
   }
-  function asRecord(value) {
+  function asRecord2(value) {
     return value != null && typeof value === "object" && !Array.isArray(value) ? value : null;
   }
   var historyLimit, ui_default;
@@ -5926,6 +7366,7 @@ svg {
       init_LayoutRules();
       init_ResponsiveSidebar();
       init_Editor();
+      init_normalizedFrameSchema();
       historyLimit = 40;
       ui_default = render(Plugin);
     }

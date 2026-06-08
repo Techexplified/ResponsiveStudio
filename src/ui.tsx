@@ -11,7 +11,8 @@ import ResponsiveSidebar, {
   type TargetDevice
 } from "./components/ResponsiveSidebar"
 import Editor from "./components/Editor"
-import type { FigmaSerializedFrame, FigmaSerializedNode, PluginToUiMessage } from "./frameSchema"
+import type { FigmaSerializedFrame, PluginToUiMessage } from "./frameSchema"
+import { denormalizeFigmaJson, deserializeNormalizedJson } from "./normalizedFrameSchema"
 
 function Plugin() {
   const [importedFrame, setImportedFrame] = useState<FigmaSerializedFrame | null>(null)
@@ -259,15 +260,13 @@ function parseJsonImport(value: string): JsonImportResult {
     }
   }
 
-  const frameCandidate = isFigmaSerializedFrame(parsed)
-    ? parsed
-    : isFigmaSerializedFrame(root.frame)
-      ? root.frame
-      : null
+  const frameResult = deserializeNormalizedJson(parsed)
 
-  if (frameCandidate == null) {
+  if (!frameResult.ok) {
     return {
-      error: "JSON must include a serialized frame."
+      error: frameResult.errors.length === 0
+        ? "JSON must include a serialized frame."
+        : `JSON frame is invalid: ${frameResult.errors[0].path} ${frameResult.errors[0].message}`
     }
   }
 
@@ -276,7 +275,7 @@ function parseJsonImport(value: string): JsonImportResult {
   const source = asRecord(root.source)
 
   return {
-    frame: cloneFrame(frameCandidate),
+    frame: denormalizeFigmaJson(frameResult.value),
     appliedAt: readString(root.appliedAt),
     targetDevice: readTargetDevice(settings?.targetDevice ?? target?.device),
     sourceWidth: readPositiveNumber(settings?.sourceWidth ?? source?.importedWidth),
@@ -308,35 +307,6 @@ function createExportFrameFromJson(frame: FigmaSerializedFrame, settings: Respon
     },
     "*"
   )
-}
-
-function isFigmaSerializedFrame(value: unknown): value is FigmaSerializedFrame {
-  const record = asRecord(value)
-
-  return record != null &&
-    (record.type === "FRAME" || record.type === "COMPONENT" || record.type === "INSTANCE") &&
-    record.schemaVersion === 1 &&
-    typeof record.importedAt === "string" &&
-    isFigmaSerializedNode(record)
-}
-
-function isFigmaSerializedNode(value: unknown): value is FigmaSerializedNode {
-  const record = asRecord(value)
-  const geometry = asRecord(record?.geometry)
-
-  return record != null &&
-    typeof record.id === "string" &&
-    typeof record.name === "string" &&
-    typeof record.type === "string" &&
-    typeof record.visible === "boolean" &&
-    typeof record.locked === "boolean" &&
-    geometry != null &&
-    typeof geometry.width === "number" &&
-    typeof geometry.height === "number" &&
-    asRecord(record.layout) != null &&
-    asRecord(record.style) != null &&
-    Array.isArray(record.children) &&
-    record.children.every((child) => isFigmaSerializedNode(child))
 }
 
 function readTargetDevice(value: unknown): TargetDevice | undefined {

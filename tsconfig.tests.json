@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "module": "CommonJS",
+    "noEmit": false,
+    "outDir": ".tmp/schema-tests",
+    "rootDir": ".",
+    "sourceMap": false,
+    "target": "ES2020"
+  },
+  "include": [
+    "src/frameSchema.ts",
+    "src/normalizedFrameSchema.ts"
+  ]
+}

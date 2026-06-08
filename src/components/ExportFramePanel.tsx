@@ -1,5 +1,6 @@
 import { h } from "preact"
 import type { FigmaSerializedFrame } from "../frameSchema"
+import { normalizeFigmaJson } from "../normalizedFrameSchema"
 import type { ResponsiveGenerationSettings } from "./ResponsiveSidebar"
 
 export type ExportFrameSnapshot = {
@@ -20,9 +21,11 @@ export default function ExportFramePanel({
   isOpen,
   onClose
 }: ExportFramePanelProps) {
+  const normalizedFrame = snapshot == null ? null : normalizeFigmaJson(snapshot.frame)
   const exportPayload = snapshot == null
     ? null
     : {
+        schemaVersion: 2,
         exportType: "responsive-frame-plan",
         appliedAt: snapshot.appliedAt,
         target: {
@@ -33,7 +36,7 @@ export default function ExportFramePanel({
           importedWidth: snapshot.settings.sourceWidth
         },
         appliedOptions: snapshot.settings.options.filter((option) => option.enabled),
-        frame: snapshot.frame
+        root: normalizedFrame?.root
       }
 
   return (

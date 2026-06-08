@@ -1,6 +1,7 @@
 import { h } from "preact"
 import { useState } from "preact/hooks"
 import type { FigmaSerializedFrame } from "../frameSchema"
+import { serializeNormalizedJson } from "../normalizedFrameSchema"
 
 type JsonViewerSliderProps = {
   frame: FigmaSerializedFrame
@@ -45,7 +46,7 @@ export function JsonViewerOverlay({
   onClose: () => void
 }) {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle")
-  const json = JSON.stringify(frame, null, 2)
+  const json = serializeNormalizedJson(frame)
 
   async function copyJson() {
     const didCopy = await copyText(json)

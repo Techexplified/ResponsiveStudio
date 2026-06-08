@@ -20,8 +20,16 @@ export type ResponsiveNodeRule = {
   stackAlignment: ResponsiveStackAlignment
 }
 
-export type FigmaSerializedNode = {
+export type SerializedSpacing = {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+export type FigmaSerializedNodeV1 = {
   id: string
+  originalFigmaId?: string
   name: string
   type: string
   responsive?: {
@@ -141,14 +149,111 @@ export type FigmaSerializedNode = {
     lineHeight?: FigmaJsonValue
     letterSpacing?: FigmaJsonValue
   }
-  children: FigmaSerializedNode[]
+  component?: FigmaJsonValue
+  instance?: FigmaJsonValue
+  metadata?: {
+    [key: string]: FigmaJsonValue
+  }
+  children: FigmaSerializedNodeV1[]
 }
 
-export type FigmaSerializedFrame = FigmaSerializedNode & {
+export type FigmaSerializedFrameV1 = FigmaSerializedNodeV1 & {
   type: "FRAME" | "COMPONENT" | "INSTANCE"
   schemaVersion: 1
   importedAt: string
 }
+
+export type FigmaSerializedNode = FigmaSerializedNodeV1
+export type FigmaSerializedFrame = FigmaSerializedFrameV1
+
+export type NormalizedLayoutMode = "NONE" | "HORIZONTAL" | "VERTICAL"
+
+export type NormalizedNodeGeometry = {
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation?: number
+}
+
+export type NormalizedNodeLayout = {
+  isAutoLayout?: boolean
+  mode?: NormalizedLayoutMode
+  constraints?: FigmaJsonValue
+  horizontalSizing?: string
+  verticalSizing?: string
+  grow?: number
+  align?: string
+  gap?: number
+  counterAxisSpacing?: number
+  primaryAlign?: string
+  counterAlign?: string
+  wrap?: boolean
+  padding?: SerializedSpacing
+  margin?: SerializedSpacing
+  primaryAxisSizingMode?: string
+  counterAxisSizingMode?: string
+}
+
+export type NormalizedNodeStyle = {
+  opacity?: number
+  blendMode?: string
+  fills?: FigmaJsonValue
+  strokes?: FigmaJsonValue
+  strokeWeight?: number
+  cornerRadius?: number | string
+  effects?: FigmaJsonValue
+}
+
+export type NormalizedFigmaNode = {
+  id: string
+  originalFigmaId?: string
+  name: string
+  type: string
+  visible?: boolean
+  locked?: boolean
+  geometry: NormalizedNodeGeometry
+  layout?: NormalizedNodeLayout
+  style?: NormalizedNodeStyle
+  styleRef?: string
+  text?: FigmaSerializedNodeV1["text"] | null
+  responsive?: FigmaSerializedNodeV1["responsive"]
+  component?: FigmaJsonValue
+  instance?: FigmaJsonValue
+  metadata?: {
+    [key: string]: FigmaJsonValue
+  }
+  children: NormalizedFigmaNode[]
+}
+
+export type NormalizedFigmaFrame = NormalizedFigmaNode & {
+  type: "FRAME" | "COMPONENT" | "INSTANCE"
+}
+
+export type NormalizedFigmaDocument = {
+  schemaVersion: 2
+  root: NormalizedFigmaFrame
+  styles?: {
+    [key: string]: NormalizedNodeStyle
+  }
+}
+
+export type ValidationIssue = {
+  path: string
+  message: string
+}
+
+export type ValidationResult<T> =
+  | {
+      ok: true
+      value: T
+      warnings: string[]
+    }
+  | {
+      ok: false
+      errors: ValidationIssue[]
+      warnings: string[]
+    }
 
 export type PluginToUiMessage =
   | {

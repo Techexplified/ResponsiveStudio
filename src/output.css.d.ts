@@ -82,6 +82,7 @@ declare const styles: {
   readonly "flex": string;
   readonly "flex-1": string;
   readonly "flex-col": string;
+  readonly "flex-grow": string;
   readonly "flex-shrink": string;
   readonly "focus-within:border-[#0f766e]": string;
   readonly "focus-within:ring-2": string;
@@ -128,6 +129,7 @@ declare const styles: {
   readonly "grid-rows-[minmax(240px,1fr)_minmax(260px,38vh)]": string;
   readonly "grid-rows-[minmax(260px,1fr)_minmax(300px,42vh)]": string;
   readonly "grid-rows-[minmax(360px,1fr)_minmax(300px,42vh)]": string;
+  readonly "grow": string;
   readonly "h-1": string;
   readonly "h-1.5": string;
   readonly "h-10": string;
