@@ -1,6 +1,7 @@
 import { h } from "preact"
 import type { ComponentChildren } from "preact"
 import type { FigmaSerializedNode } from "../frameSchema"
+import { createEditorGeometry } from "./editorModel"
 
 type FlexLayoutPanelProps = {
   node: FigmaSerializedNode
@@ -32,6 +33,9 @@ export default function FlexLayoutPanel({
     bottom: 0,
     left: 0
   }
+  const widthSizing = getCurrentWidthSizing()
+  const heightSizing = getCurrentHeightSizing()
+  const sizingOptions = getSizingOptions(parentLayoutMode != null)
 
   function updateLayout(
     nextLayout: Partial<FigmaSerializedNode["layout"]>,
@@ -50,35 +54,39 @@ export default function FlexLayoutPanel({
   }
 
   function updateWidthSizing(sizingMode: SizingMode) {
+    const safeSizingMode = normalizeSelectableSizingMode(sizingMode, parentLayoutMode)
+
     updateLayout(normalizeChildSizingForParent({
-      widthSizing: sizingMode,
-      heightSizing: getCurrentHeightSizing()
+      widthSizing: safeSizingMode,
+      heightSizing
     }, {
       parentLayoutMode
     }, {
-      layoutSizingHorizontal: sizingMode,
+      layoutSizingHorizontal: safeSizingMode,
       ...(isContainer && layout.layoutMode === "HORIZONTAL"
-        ? { primaryAxisSizingMode: toAxisSizingMode(sizingMode) }
+        ? { primaryAxisSizingMode: toAxisSizingMode(safeSizingMode) }
         : {}),
       ...(isContainer && layout.layoutMode !== "HORIZONTAL"
-        ? { counterAxisSizingMode: toAxisSizingMode(sizingMode) }
+        ? { counterAxisSizingMode: toAxisSizingMode(safeSizingMode) }
         : {})
     }))
   }
 
   function updateHeightSizing(sizingMode: SizingMode) {
+    const safeSizingMode = normalizeSelectableSizingMode(sizingMode, parentLayoutMode)
+
     updateLayout(normalizeChildSizingForParent({
-      widthSizing: getCurrentWidthSizing(),
-      heightSizing: sizingMode
+      widthSizing,
+      heightSizing: safeSizingMode
     }, {
       parentLayoutMode
     }, {
-      layoutSizingVertical: sizingMode,
+      layoutSizingVertical: safeSizingMode,
       ...(isContainer && layout.layoutMode === "VERTICAL"
-        ? { primaryAxisSizingMode: toAxisSizingMode(sizingMode) }
+        ? { primaryAxisSizingMode: toAxisSizingMode(safeSizingMode) }
         : {}),
       ...(isContainer && layout.layoutMode !== "VERTICAL"
-        ? { counterAxisSizingMode: toAxisSizingMode(sizingMode) }
+        ? { counterAxisSizingMode: toAxisSizingMode(safeSizingMode) }
         : {})
     }))
   }
@@ -87,17 +95,121 @@ export default function FlexLayoutPanel({
     updateWidthSizing("FILL")
   }
 
+  function updateDirection(layoutMode: Direction) {
+    const currentLayoutMode = layout.layoutMode === "HORIZONTAL" ? "HORIZONTAL" : "VERTICAL"
+
+    if (currentLayoutMode === layoutMode) {
+      return
+    }
+
+    const nextChildren = node.children.map((child) =>
+      normalizeChildForParentDirection(child, currentLayoutMode, layoutMode)
+    )
+
+    // A gap that looked reasonable on the old axis can be enormous on the
+    // new axis (for example, a 492 px horizontal gap becomes 492 px vertical
+    // whitespace). Reset oversized imported gaps when switching direction.
+    const nextItemSpacing = Math.min(layout.itemSpacing ?? 0, 48)
+
+    onChange({
+      ...node,
+      children: nextChildren,
+      layout: {
+        ...layout,
+        isAutoLayout: true,
+        autoLayoutDirection: layoutMode,
+        layoutMode,
+        itemSpacing: nextItemSpacing,
+        // Keep the container wrapped around its children on the new main axis.
+        primaryAxisSizingMode: "AUTO",
+        ...(layoutMode === "VERTICAL"
+          ? { layoutSizingVertical: "HUG" as const }
+          : { layoutSizingHorizontal: "HUG" as const })
+      }
+    })
+  }
+
+  function updateWidthValue(width: number) {
+    const nextWidth = clampDimension(width)
+
+    updateLayoutAndGeometry(
+      normalizeChildSizingForParent({
+        widthSizing: "FIXED",
+        heightSizing
+      }, {
+        parentLayoutMode
+      }, {
+        layoutSizingHorizontal: "FIXED",
+        ...(isContainer && layout.layoutMode === "HORIZONTAL"
+          ? { primaryAxisSizingMode: "FIXED" as const }
+          : {}),
+        ...(isContainer && layout.layoutMode !== "HORIZONTAL"
+          ? { counterAxisSizingMode: "FIXED" as const }
+          : {})
+      }),
+      nextWidth,
+      node.geometry.height
+    )
+  }
+
+  function updateHeightValue(height: number) {
+    const nextHeight = clampDimension(height)
+
+    updateLayoutAndGeometry(
+      normalizeChildSizingForParent({
+        widthSizing,
+        heightSizing: "FIXED"
+      }, {
+        parentLayoutMode
+      }, {
+        layoutSizingVertical: "FIXED",
+        ...(isContainer && layout.layoutMode === "VERTICAL"
+          ? { primaryAxisSizingMode: "FIXED" as const }
+          : {}),
+        ...(isContainer && layout.layoutMode !== "VERTICAL"
+          ? { counterAxisSizingMode: "FIXED" as const }
+          : {})
+      }),
+      node.geometry.width,
+      nextHeight
+    )
+  }
+
+  function updateLayoutAndGeometry(
+    nextLayout: Partial<FigmaSerializedNode["layout"]>,
+    width: number,
+    height: number
+  ) {
+    onChange({
+      ...node,
+      geometry: createEditorGeometry(
+        node.geometry.x,
+        node.geometry.y,
+        width,
+        height,
+        node.geometry
+      ),
+      layout: {
+        ...layout,
+        isAutoLayout: layout.isAutoLayout || isContainer,
+        ...nextLayout
+      }
+    })
+  }
+
   function getCurrentWidthSizing(): SizingMode {
     return getSizingMode(
       layout.layoutSizingHorizontal,
-      layout.layoutMode === "HORIZONTAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode
+      layout.layoutMode === "HORIZONTAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode,
+      parentLayoutMode != null
     )
   }
 
   function getCurrentHeightSizing(): SizingMode {
     return getSizingMode(
       layout.layoutSizingVertical,
-      layout.layoutMode === "VERTICAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode
+      layout.layoutMode === "VERTICAL" ? layout.primaryAxisSizingMode : layout.counterAxisSizingMode,
+      parentLayoutMode != null
     )
   }
 
@@ -112,10 +224,7 @@ export default function FlexLayoutPanel({
                 { value: "HORIZONTAL", label: "Row" },
                 { value: "VERTICAL", label: "Column" }
               ]}
-              onChange={(layoutMode) => updateLayout({
-                autoLayoutDirection: layoutMode,
-                layoutMode
-              }, { forceAutoLayout: true })}
+              onChange={updateDirection}
             />
           </ControlGroup>
         )}
@@ -171,28 +280,38 @@ export default function FlexLayoutPanel({
         <div class="grid grid-cols-2 gap-2">
           <SelectField<SizingMode>
             label="Width"
-            value={getCurrentWidthSizing()}
-            options={[
-              { value: "FILL", label: "Fill" },
-              { value: "HUG", label: "Hug" },
-              { value: "FIXED", label: "Fixed" }
-            ]}
+            value={widthSizing}
+            options={sizingOptions}
             onChange={updateWidthSizing}
           />
 
           <SelectField<SizingMode>
             label="Height"
-            value={getCurrentHeightSizing()}
-            options={[
-              { value: "FILL", label: "Fill" },
-              { value: "HUG", label: "Hug" },
-              { value: "FIXED", label: "Fixed" }
-            ]}
+            value={heightSizing}
+            options={sizingOptions}
             onChange={updateHeightSizing}
           />
         </div>
 
-        {!isContainer && (
+        <div class="grid grid-cols-2 gap-2">
+          <NumberField
+            label="W"
+            value={Math.round(node.geometry.width)}
+            min={1}
+            max={10000}
+            onChange={updateWidthValue}
+          />
+
+          <NumberField
+            label="H"
+            value={Math.round(node.geometry.height)}
+            min={1}
+            max={10000}
+            onChange={updateHeightValue}
+          />
+        </div>
+
+        {!isContainer && parentLayoutMode != null && (
           <button
             type="button"
             onClick={stretchToParent}
@@ -237,10 +356,15 @@ function isFrameLikeNode(node: FigmaSerializedNode): boolean {
 
 function getSizingMode(
   layoutSizing: string | undefined,
-  axisSizing: string | undefined
+  axisSizing: string | undefined,
+  canFillParent: boolean
 ): SizingMode {
+  if (canFillParent && layoutSizing === "FILL") {
+    return "FILL"
+  }
+
   if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
-    return layoutSizing
+    return layoutSizing === "FILL" ? "FIXED" : layoutSizing
   }
 
   if (axisSizing === "AUTO") {
@@ -248,6 +372,153 @@ function getSizingMode(
   }
 
   return "FIXED"
+}
+
+function getSizingOptions(canFillParent: boolean): Array<{
+  value: SizingMode
+  label: string
+}> {
+  const options: Array<{
+    value: SizingMode
+    label: string
+  }> = [
+    { value: "HUG", label: "Hug" },
+    { value: "FIXED", label: "Fixed" }
+  ]
+
+  return canFillParent
+    ? [{ value: "FILL", label: "Fill" }, ...options]
+    : options
+}
+
+function normalizeSelectableSizingMode(sizingMode: SizingMode, parentLayoutMode: Direction | null): SizingMode {
+  return sizingMode === "FILL" && parentLayoutMode == null ? "FIXED" : sizingMode
+}
+
+function normalizeChildForParentDirection(
+  child: FigmaSerializedNode,
+  currentParentLayoutMode: Direction,
+  nextParentLayoutMode: Direction
+): FigmaSerializedNode {
+  const widthSizing = getChildAxisSizingForParent(
+    child,
+    getSourceAxisForTargetAxis("horizontal", nextParentLayoutMode, currentParentLayoutMode),
+    currentParentLayoutMode
+  )
+  const heightSizing = getChildAxisSizingForParent(
+    child,
+    getSourceAxisForTargetAxis("vertical", nextParentLayoutMode, currentParentLayoutMode),
+    currentParentLayoutMode
+  )
+
+  return {
+    ...child,
+    layout: {
+      ...child.layout,
+      ...normalizeChildSizingForParent({
+        widthSizing,
+        heightSizing
+      }, {
+        parentLayoutMode: nextParentLayoutMode
+      }, {
+        layoutSizingHorizontal: widthSizing,
+        layoutSizingVertical: heightSizing
+      })
+    }
+  }
+}
+
+function getChildAxisSizingForParent(
+  child: FigmaSerializedNode,
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: Direction
+): SizingMode {
+  const layoutSizing = axis === "horizontal"
+    ? child.layout.layoutSizingHorizontal
+    : child.layout.layoutSizingVertical
+
+  if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
+    return layoutSizing
+  }
+
+  const axisSizing = axisMatchesPrimaryAxis(child, axis)
+    ? child.layout.primaryAxisSizingMode
+    : child.layout.counterAxisSizingMode
+
+  if (axisSizing === "AUTO") {
+    return "HUG"
+  }
+
+  if (axisSizing === "FIXED") {
+    return "FIXED"
+  }
+
+  if (child.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return "FILL"
+  }
+
+  if (
+    typeof child.layout.layoutGrow === "number" &&
+    child.layout.layoutGrow > 0 &&
+    axisMatchesPrimaryParentAxis(parentLayoutMode, axis)
+  ) {
+    return "FILL"
+  }
+
+  return "FIXED"
+}
+
+function axisMatchesPrimaryAxis(child: FigmaSerializedNode, axis: "horizontal" | "vertical"): boolean {
+  return axis === "horizontal"
+    ? child.layout.layoutMode === "HORIZONTAL"
+    : child.layout.layoutMode === "VERTICAL"
+}
+
+function axisMatchesPrimaryParentAxis(
+  parentLayoutMode: Direction,
+  axis: "horizontal" | "vertical"
+): boolean {
+  return axis === "horizontal"
+    ? parentLayoutMode === "HORIZONTAL"
+    : parentLayoutMode === "VERTICAL"
+}
+
+function axisMatchesCrossAxis(
+  parentLayoutMode: Direction,
+  axis: "horizontal" | "vertical"
+): boolean {
+  return axis === "horizontal"
+    ? parentLayoutMode === "VERTICAL"
+    : parentLayoutMode === "HORIZONTAL"
+}
+
+function getSourceAxisForTargetAxis(
+  axis: "horizontal" | "vertical",
+  targetParentLayoutMode: Direction,
+  sourceParentLayoutMode: Direction
+): "horizontal" | "vertical" {
+  if (targetParentLayoutMode === sourceParentLayoutMode) {
+    return axis
+  }
+
+  return axisMatchesPrimaryParentAxis(targetParentLayoutMode, axis)
+    ? getParentAxis(sourceParentLayoutMode, "primary")
+    : getParentAxis(sourceParentLayoutMode, "cross")
+}
+
+function getParentAxis(
+  parentLayoutMode: Direction,
+  role: "primary" | "cross"
+): "horizontal" | "vertical" {
+  if (role === "primary") {
+    return parentLayoutMode === "HORIZONTAL" ? "horizontal" : "vertical"
+  }
+
+  return parentLayoutMode === "HORIZONTAL" ? "vertical" : "horizontal"
+}
+
+function clampDimension(value: number): number {
+  return Math.min(10000, Math.max(1, Math.round(value)))
 }
 
 function toAxisSizingMode(sizingMode: SizingMode): "AUTO" | "FIXED" {
@@ -280,7 +551,11 @@ function normalizeChildSizingForParent(
     }
   }
 
-  return nextLayout
+  return {
+    ...nextLayout,
+    layoutGrow: 0,
+    layoutAlign: "INHERIT"
+  }
 }
 
 function ControlGroup({

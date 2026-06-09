@@ -78,7 +78,7 @@ export default function ExportPreviewDrawer({
               Export Preview
             </h3>
             <p class="mt-0.5 text-[11px] text-gray-500">
-              {getDeviceLabel(targetDevice)} · {Math.round(screenWidth)}px ref
+              {getDeviceLabel(targetDevice)}
             </p>
           </div>
         ) : (
@@ -233,10 +233,6 @@ function GeneratedPreview({
                 <span class="font-semibold text-gray-500">
                   {getDeviceLabel(targetDevice)}
                 </span>
-                <span class="text-gray-300">·</span>
-                <span class="font-semibold text-gray-500">
-                  {Math.round(reviewWidth)}px ref
-                </span>
               </div>
               <div class="flex shrink-0 items-center gap-2">
                 {selectedNodeId != null && (
@@ -331,15 +327,16 @@ function ResponsiveReviewNode({
   }
 
   const isSelected = selectedNodeId === node.id
+  const renderNode = materializeReplacementNode(node, reviewWidth) ?? node
 
-  if (isVirtualGroup(node)) {
-    const arrangedChildren = arrangeResponsiveChildren(node, layoutRules, reviewWidth)
-    const renderedHeight = getResponsiveNodeHeight(node, layoutRules, reviewWidth)
+  if (isVirtualGroup(renderNode)) {
+    const arrangedChildren = arrangeResponsiveChildren(renderNode, layoutRules, reviewWidth)
+    const renderedHeight = getResponsiveNodeHeight(renderNode, layoutRules, reviewWidth)
 
     return (
       <div
         class="absolute cursor-pointer overflow-visible"
-        title={node.name}
+        title={renderNode.name}
         onClick={(event) => {
           event.stopPropagation()
           onPreviewClick(node.id)
@@ -350,9 +347,9 @@ function ResponsiveReviewNode({
           onPreviewInspect(node.id)
         }}
         style={{
-          left: `${(node.geometry.x - origin.x) * scale}px`,
-          top: `${(node.geometry.y - origin.y) * scale}px`,
-          width: `${node.geometry.width * scale}px`,
+          left: `${(renderNode.geometry.x - origin.x) * scale}px`,
+          top: `${(renderNode.geometry.y - origin.y) * scale}px`,
+          width: `${renderNode.geometry.width * scale}px`,
           height: `${renderedHeight * scale}px`,
           outline: isSelected ? "2px solid #0f766e" : "1px dashed rgba(15, 118, 110, 0.35)",
           outlineOffset: isSelected ? "-2px" : "-1px",
@@ -376,21 +373,21 @@ function ResponsiveReviewNode({
     )
   }
 
-  const fillColor = getSolidFillColor(node.style.fills)
-  const isTextNode = node.text != null
+  const fillColor = getSolidFillColor(renderNode.style.fills)
+  const isTextNode = renderNode.text != null
   const backgroundColor = isTextNode ? undefined : fillColor
   const textColor = isTextNode ? fillColor : undefined
-  const borderColor = getSolidFillColor(node.style.strokes)
+  const borderColor = getSolidFillColor(renderNode.style.strokes)
   const borderWidth = borderColor == null
     ? 0
-    : Math.max(1, (node.style.strokeWeight ?? 1) * scale)
-  const arrangedChildren = arrangeResponsiveChildren(node, layoutRules, reviewWidth)
-  const renderedHeight = getResponsiveNodeHeight(node, layoutRules, reviewWidth)
+    : Math.max(1, (renderNode.style.strokeWeight ?? 1) * scale)
+  const arrangedChildren = arrangeResponsiveChildren(renderNode, layoutRules, reviewWidth)
+  const renderedHeight = getResponsiveNodeHeight(renderNode, layoutRules, reviewWidth)
 
   return (
     <div
       class="absolute cursor-pointer overflow-hidden"
-      title={node.name}
+      title={renderNode.name}
       onClick={(event) => {
         event.stopPropagation()
         onPreviewClick(node.id)
@@ -401,42 +398,42 @@ function ResponsiveReviewNode({
         onPreviewInspect(node.id)
       }}
       style={{
-        left: `${(node.geometry.x - origin.x) * scale}px`,
-        top: `${(node.geometry.y - origin.y) * scale}px`,
-        width: `${node.geometry.width * scale}px`,
+        left: `${(renderNode.geometry.x - origin.x) * scale}px`,
+        top: `${(renderNode.geometry.y - origin.y) * scale}px`,
+        width: `${renderNode.geometry.width * scale}px`,
         height: `${renderedHeight * scale}px`,
-        opacity: node.style.opacity,
+        opacity: renderNode.style.opacity,
         backgroundColor,
         borderColor,
         borderStyle: borderColor == null ? undefined : "solid",
         borderWidth: `${borderWidth}px`,
-        borderRadius: getCornerRadius(node.style.cornerRadius, scale),
+        borderRadius: getCornerRadius(renderNode.style.cornerRadius, scale),
         outline: isSelected ? "2px solid #0f766e" : undefined,
         outlineOffset: isSelected ? "-2px" : undefined,
         boxShadow: isSelected ? "0 0 0 3px rgba(15, 118, 110, 0.14)" : undefined
       }}
     >
-      {node.text != null && (
+      {renderNode.text != null && (
         <div
           class="h-full w-full overflow-hidden"
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "stretch",
-            justifyContent: getTextVerticalJustify(node),
-            fontSize: typeof node.text.fontSize === "number"
-              ? `${getResponsiveFontSize(node.text.fontSize, scale, layoutRules)}px`
+            justifyContent: getTextVerticalJustify(renderNode),
+            fontSize: typeof renderNode.text.fontSize === "number"
+              ? `${getResponsiveFontSize(renderNode.text.fontSize, scale, layoutRules)}px`
               : undefined,
-            fontFamily: getTextFontFamily(node),
-            fontWeight: getTextFontWeight(node),
-            lineHeight: layoutRules.tightenLineHeight ? 1.15 : getTextLineHeight(node, scale),
+            fontFamily: getTextFontFamily(renderNode),
+            fontWeight: getTextFontWeight(renderNode),
+            lineHeight: layoutRules.tightenLineHeight ? 1.15 : getTextLineHeight(renderNode, scale),
             color: textColor ?? "#1f2937",
-            textAlign: getTextHorizontalAlign(node),
+            textAlign: getTextHorizontalAlign(renderNode),
             whiteSpace: "pre-wrap",
             wordBreak: "break-word"
           }}
         >
-          {node.text.characters}
+          {renderNode.text.characters}
         </div>
       )}
 
@@ -510,7 +507,7 @@ function ExportInspectorPanel({
       <div class="min-h-0 flex-1 overflow-auto p-3">
         <InspectorSection title={isFrame ? "Canvas" : "Export Box"}>
           <div class="grid grid-cols-2 gap-2">
-            <InspectorMetric label={isFrame ? "Reference" : "Width"} value={`${Math.round(isFrame ? reviewWidth : node.geometry.width)}px`} />
+            <InspectorMetric label="Width" value={`${Math.round(isFrame ? reviewWidth : node.geometry.width)}px`} />
             <InspectorMetric label="Height" value={`${Math.round(renderedHeight)}px`} />
             <InspectorMetric label="X" value={`${Math.round(node.geometry.x)}px`} />
             <InspectorMetric label="Y" value={`${Math.round(node.geometry.y)}px`} />
@@ -649,11 +646,169 @@ function formatConversionDirection(direction: EffectiveLayoutRules["conversionDi
   return direction === "row-to-column" ? "Row > Column" : "Column > Row"
 }
 
+function materializeReplacementNode(node: FigmaSerializedNode, reviewWidth: number): FigmaSerializedNode | null {
+  const rule = node.responsive?.replacement
+
+  if (rule == null || !isReplacementActive(rule, reviewWidth)) {
+    return null
+  }
+
+  const width = clampReplacementDimension(rule.width)
+  const height = clampReplacementDimension(rule.height)
+  const lineWidth = Math.max(12, Math.min(width - 12, Math.round(width * 0.5)))
+  const lineHeight = Math.max(2, Math.min(4, Math.round(height * 0.08)))
+  const gap = Math.max(4, Math.round(height * 0.12))
+  const totalLineHeight = lineHeight * 3 + gap * 2
+  const startX = Math.max(0, (width - lineWidth) / 2)
+  const startY = Math.max(0, (height - totalLineHeight) / 2)
+
+  return {
+    ...node,
+    name: `${node.name} / hamburger`,
+    geometry: resizePreviewGeometry(node, width, height),
+    layout: {
+      ...node.layout,
+      isAutoLayout: false,
+      layoutMode: "NONE",
+      autoLayoutDirection: "NONE",
+      layoutGrow: 0,
+      layoutAlign: "INHERIT",
+      layoutSizingHorizontal: "FIXED",
+      layoutSizingVertical: "FIXED",
+      primaryAxisSizingMode: "FIXED",
+      counterAxisSizingMode: "FIXED"
+    },
+    style: {
+      ...node.style,
+      fills: [solidPaint(1, 1, 1)],
+      strokes: [solidPaint(0.15, 0.17, 0.2)],
+      strokeWeight: 1,
+      cornerRadius: 8
+    },
+    text: undefined,
+    children: [0, 1, 2].map((index) => ({
+      id: `${node.id}-hamburger-line-${index}`,
+      name: `Hamburger line ${index + 1}`,
+      type: "RECTANGLE",
+      visible: true,
+      locked: false,
+      geometry: createPreviewGeometry(
+        startX,
+        startY + index * (lineHeight + gap),
+        lineWidth,
+        lineHeight
+      ),
+      layout: {
+        isAutoLayout: false,
+        layoutMode: "NONE",
+        layoutSizingHorizontal: "FIXED",
+        layoutSizingVertical: "FIXED"
+      },
+      style: {
+        fills: [solidPaint(0.1, 0.12, 0.16)],
+        cornerRadius: 999
+      },
+      children: []
+    }))
+  }
+}
+
+function isReplacementActive(
+  rule: NonNullable<FigmaSerializedNode["responsive"]>["replacement"],
+  reviewWidth: number
+): boolean {
+  if (rule == null || rule.enabled !== true || rule.preset !== "hamburger") {
+    return false
+  }
+
+  if (rule.trigger === "always") {
+    return true
+  }
+
+  if (rule.trigger === "never") {
+    return false
+  }
+
+  return reviewWidth <= rule.breakpoint
+}
+
+function resizePreviewGeometry(node: FigmaSerializedNode, width: number, height: number): FigmaSerializedNode["geometry"] {
+  return createPreviewGeometry(node.geometry.x, node.geometry.y, width, height, node.geometry)
+}
+
+function createPreviewGeometry(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  existing?: FigmaSerializedNode["geometry"]
+): FigmaSerializedNode["geometry"] {
+  const bounds = {
+    x,
+    y,
+    width,
+    height,
+    right: x + width,
+    bottom: y + height,
+    centerX: x + width / 2,
+    centerY: y + height / 2
+  }
+
+  return {
+    x,
+    y,
+    width,
+    height,
+    rotation: existing?.rotation ?? 0,
+    absoluteBounds: bounds,
+    parentRelativeBounds: bounds,
+    rootRelativeBounds: bounds,
+    percentOfParent: existing?.percentOfParent,
+    percentOfRoot: existing?.percentOfRoot ?? {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      right: 0,
+      bottom: 0
+    },
+    hierarchy: existing?.hierarchy ?? {
+      parentId: null,
+      depth: 0,
+      siblingIndex: 0,
+      siblingCount: 1
+    }
+  }
+}
+
+function solidPaint(r: number, g: number, b: number) {
+  return {
+    type: "SOLID",
+    visible: true,
+    opacity: 1,
+    color: {
+      r,
+      g,
+      b
+    }
+  }
+}
+
+function clampReplacementDimension(value: number): number {
+  return Math.min(240, Math.max(16, Math.round(value)))
+}
+
 function getResponsiveNodeHeight(
   node: FigmaSerializedNode,
   layoutRules: LayoutRulesState,
   reviewWidth: number
 ): number {
+  const replacementNode = materializeReplacementNode(node, reviewWidth)
+
+  if (replacementNode != null) {
+    return replacementNode.geometry.height
+  }
+
   if (node.children.length === 0) {
     return node.geometry.height
   }
@@ -672,7 +827,7 @@ function getResponsiveNodeHeight(
     left: 0
   }
 
-  if (getNodeAxisSizing(node, "vertical") === "HUG") {
+  if (getNodeAxisSizing(node, "vertical", getNativeLayoutMode(node)) === "HUG") {
     return Math.max(1, childrenBottom + padding.bottom)
   }
 
@@ -692,6 +847,7 @@ function createExportReviewGroups(frame: FigmaSerializedFrame, reviewWidth: numb
   const contentWidth = Math.max(1, reviewWidth - outerPadding * 2)
   const visibleChildren = frame.children
     .filter((child) => child.visible)
+    .map((child) => materializeReplacementNode(child, reviewWidth) ?? child)
     .sort((first, second) => first.geometry.y - second.geometry.y || first.geometry.x - second.geometry.x)
 
   let nextY = outerPadding
@@ -723,29 +879,35 @@ function arrangeResponsiveChildren(
 ): Array<{
   node: FigmaSerializedNode
 }> {
-  const effectiveRules = getEffectiveLayoutRules(node, layoutRules)
-  const convertedLayoutMode = getConvertedLayoutMode(node, effectiveRules, reviewWidth)
-  const activeLayoutMode = convertedLayoutMode ?? getNativeLayoutMode(node)
+  const layoutNode = {
+    ...node,
+    children: node.children.map((child) => materializeReplacementNode(child, reviewWidth) ?? child)
+  }
+  const effectiveRules = getEffectiveLayoutRules(layoutNode, layoutRules)
+  const convertedLayoutMode = getConvertedLayoutMode(layoutNode, effectiveRules, reviewWidth)
+  const activeLayoutMode = convertedLayoutMode ?? getNativeLayoutMode(layoutNode)
+  const sourceParentLayoutMode = getNativeLayoutMode(layoutNode) ?? activeLayoutMode
   const activeRules = convertedLayoutMode == null
-    ? getNativeLayoutRules(node, effectiveRules)
+    ? getNativeLayoutRules(layoutNode, effectiveRules)
     : effectiveRules
 
   if (activeLayoutMode == null) {
-    return node.children.map((child) => ({ node: child }))
+    return layoutNode.children.map((child) => ({ node: child }))
   }
 
   if (activeLayoutMode === "HORIZONTAL") {
-    return arrangeChildrenHorizontally(node, layoutRules, activeRules, reviewWidth)
+    return arrangeChildrenHorizontally(layoutNode, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
   }
 
-  return arrangeChildrenVertically(node, layoutRules, activeRules, reviewWidth)
+  return arrangeChildrenVertically(layoutNode, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
 }
 
 function arrangeChildrenVertically(
   node: FigmaSerializedNode,
   layoutRules: LayoutRulesState,
   effectiveRules: EffectiveLayoutRules,
-  reviewWidth: number
+  reviewWidth: number,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
 ): Array<{
   node: FigmaSerializedNode
 }> {
@@ -764,7 +926,8 @@ function arrangeChildrenVertically(
       child,
       "horizontal",
       effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
-      "VERTICAL"
+      "VERTICAL",
+      sourceParentLayoutMode
     )
       ? contentWidth
       : Math.min(child.geometry.width, contentWidth)
@@ -780,7 +943,7 @@ function arrangeChildrenVertically(
       child,
       childWidth,
       baseHeight: getResponsiveNodeHeight(childForWidth, layoutRules, reviewWidth),
-      fillsHeight: shouldFillAxis(child, "vertical", false, "VERTICAL")
+      fillsHeight: shouldFillAxis(child, "vertical", false, "VERTICAL", sourceParentLayoutMode)
     }
   })
   const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length
@@ -824,7 +987,8 @@ function arrangeChildrenHorizontally(
   node: FigmaSerializedNode,
   layoutRules: LayoutRulesState,
   effectiveRules: EffectiveLayoutRules,
-  reviewWidth: number
+  reviewWidth: number,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
 ): Array<{
   node: FigmaSerializedNode
 }> {
@@ -840,12 +1004,13 @@ function arrangeChildrenHorizontally(
   const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1)
   const childLayouts = node.children.map((child) => ({
     child,
-    fillsWidth: shouldFillAxis(child, "horizontal", false, "HORIZONTAL"),
+    fillsWidth: shouldFillAxis(child, "horizontal", false, "HORIZONTAL", sourceParentLayoutMode),
     childHeight: shouldFillAxis(
       child,
       "vertical",
       effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
-      "HORIZONTAL"
+      "HORIZONTAL",
+      sourceParentLayoutMode
     )
       ? contentHeight
       : child.geometry.height
@@ -984,11 +1149,25 @@ function shouldFillAxis(
   node: FigmaSerializedNode,
   axis: "horizontal" | "vertical",
   defaultFill: boolean,
-  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = null
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = null,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = parentLayoutMode
 ): boolean {
-  const sizingMode = getNodeAxisSizing(node, axis, parentLayoutMode)
+  const sizingMode = getNodeAxisSizingForParent(node, axis, parentLayoutMode, sourceParentLayoutMode)
 
   return sizingMode === "FILL" || (sizingMode == null && defaultFill)
+}
+
+function getNodeAxisSizingForParent(
+  node: FigmaSerializedNode,
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
+): AxisSizingMode {
+  return getNodeAxisSizing(
+    node,
+    getSourceAxisForTargetAxis(axis, parentLayoutMode, sourceParentLayoutMode),
+    sourceParentLayoutMode
+  )
 }
 
 function getNodeAxisSizing(
@@ -1025,6 +1204,35 @@ function getNodeAxisSizing(
   }
 
   return null
+}
+
+function getSourceAxisForTargetAxis(
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
+): "horizontal" | "vertical" {
+  if (
+    parentLayoutMode == null ||
+    sourceParentLayoutMode == null ||
+    parentLayoutMode === sourceParentLayoutMode
+  ) {
+    return axis
+  }
+
+  return axisMatchesPrimaryParentAxis(parentLayoutMode, axis)
+    ? getParentAxis(sourceParentLayoutMode, "primary")
+    : getParentAxis(sourceParentLayoutMode, "cross")
+}
+
+function getParentAxis(
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  role: "primary" | "cross"
+): "horizontal" | "vertical" {
+  if (role === "primary") {
+    return parentLayoutMode === "HORIZONTAL" ? "horizontal" : "vertical"
+  }
+
+  return parentLayoutMode === "HORIZONTAL" ? "vertical" : "horizontal"
 }
 
 function axisMatchesPrimaryAxis(node: FigmaSerializedNode, axis: "horizontal" | "vertical"): boolean {

@@ -2,7 +2,7 @@ import { h } from "preact"
 import { useEffect, useState } from "preact/hooks"
 import FlexLayoutPanel from "./FlexLayoutPanel"
 import type { LayoutRulesState } from "./LayoutRules"
-import type { FigmaSerializedFrame, FigmaSerializedNode, ResponsiveNodeRule } from "../frameSchema"
+import type { FigmaSerializedFrame, FigmaSerializedNode, ResponsiveNodeRule, ResponsiveReplacementRule } from "../frameSchema"
 import {
   canAcceptDrop,
   containsNode,
@@ -267,6 +267,27 @@ export default function LayerPanel({
     )
   }
 
+  function changeResponsiveReplacement(nodeId: string, nextReplacement: ResponsiveReplacementRule | undefined) {
+    onFrameChange(
+      updateNode(frame, nodeId, (node) => {
+        const responsive = {
+          ...node.responsive
+        }
+
+        if (nextReplacement == null) {
+          delete responsive.replacement
+        } else {
+          responsive.replacement = nextReplacement
+        }
+
+        return {
+          ...node,
+          responsive
+        }
+      })
+    )
+  }
+
   function openContextMenu(event: MouseEvent, nodeId: string) {
     event.preventDefault()
     event.stopPropagation()
@@ -282,7 +303,7 @@ export default function LayerPanel({
 
   return (
     <aside
-      class="relative flex min-h-0 flex-col border-l border-[#e5e7eb] bg-white"
+      class="relative flex h-full min-h-0 flex-col overflow-hidden border-l border-[#e5e7eb] bg-white"
       tabIndex={0}
       onKeyDown={handleLayerPanelKeyDown}
     >
@@ -299,7 +320,7 @@ export default function LayerPanel({
         onFrameChange={onFrameChange}
       />
 
-      <div class="min-h-0 flex-1 overflow-auto p-3">
+      <div class="min-h-24 flex-1 overflow-auto p-3">
         <LayerNode
           node={frame}
           depth={0}
@@ -327,7 +348,7 @@ export default function LayerPanel({
       )}
 
       {selectedNode != null && (
-        <div class="shrink-0 border-t border-[#e5e7eb] bg-white">
+        <div class="flex max-h-[72%] shrink-0 flex-col overflow-hidden border-t border-[#e5e7eb] bg-white">
           <button
             type="button"
             onClick={() => setIsLayoutPanelOpen((current) => !current)}
@@ -348,12 +369,16 @@ export default function LayerPanel({
           </button>
 
           {isLayoutPanelOpen && (
-            <div class="max-h-[45vh] overflow-auto">
+            <div class="min-h-0 flex-1 overflow-auto overscroll-contain pb-4">
               <FlexLayoutPanel
                 node={selectedNode}
                 parentLayoutMode={selectedParentLayoutMode}
                 onChange={(nextNode) => {
-                  const laidOutNode = applyFlexLayoutToNode(nextNode)
+                  const directionChanged = didLayoutDirectionChange(selectedNode, nextNode)
+                  const editableNode = directionChanged
+                    ? pinGeneratedLayoutDirection(nextNode, layoutRules)
+                    : nextNode
+                  const laidOutNode = applyFlexLayoutToNode(editableNode)
                   const frameWithUpdatedNode = updateNode(frame, laidOutNode.id, () => laidOutNode)
                   const parentNode = findParentNode(frameWithUpdatedNode, laidOutNode.id)
                   const frameWithParentLayout = parentNode == null
@@ -372,6 +397,7 @@ export default function LayerPanel({
                 node={selectedNode}
                 globalRules={layoutRules}
                 onChange={(nextRule) => changeResponsiveRule(selectedNode.id, nextRule)}
+                onReplacementChange={(nextReplacement) => changeResponsiveReplacement(selectedNode.id, nextReplacement)}
               />
             </div>
           )}
@@ -387,6 +413,31 @@ function getLayoutMode(node: FigmaSerializedNode | null): "HORIZONTAL" | "VERTIC
   }
 
   return null
+}
+
+function didLayoutDirectionChange(
+  previousNode: FigmaSerializedNode,
+  nextNode: FigmaSerializedNode
+): boolean {
+  return getLayoutMode(previousNode) !== getLayoutMode(nextNode) && getLayoutMode(nextNode) != null
+}
+
+function pinGeneratedLayoutDirection(
+  node: FigmaSerializedNode,
+  globalRules: LayoutRulesState
+): FigmaSerializedNode {
+  return {
+    ...node,
+    responsive: {
+      ...node.responsive,
+      nodeRule: {
+        ...createResponsiveNodeRule(globalRules),
+        ...node.responsive?.nodeRule,
+        enabled: true,
+        rowToColumnMode: "never"
+      }
+    }
+  }
 }
 
 function LayerTools({
@@ -573,20 +624,33 @@ type LayerContextMenuState = {
 function ResponsiveBehaviorPanel({
   node,
   globalRules,
-  onChange
+  onChange,
+  onReplacementChange
 }: {
   node: FigmaSerializedNode
   globalRules: LayoutRulesState
   onChange: (rule: ResponsiveNodeRule | undefined) => void
+  onReplacementChange: (rule: ResponsiveReplacementRule | undefined) => void
 }) {
   const isContainer = node.children.length > 0
   const currentRule = node.responsive?.nodeRule
+  const currentReplacement = node.responsive?.replacement
   const isCustom = currentRule?.enabled === true
+  const isReplacementEnabled = currentReplacement?.enabled === true
   const rule = currentRule ?? createResponsiveNodeRule(globalRules)
+  const replacement = currentReplacement ?? createResponsiveReplacementRule(globalRules)
 
   function updateRule(nextRule: Partial<ResponsiveNodeRule>) {
     onChange({
       ...rule,
+      enabled: true,
+      ...nextRule
+    })
+  }
+
+  function updateReplacement(nextRule: Partial<ResponsiveReplacementRule>) {
+    onReplacementChange({
+      ...replacement,
       enabled: true,
       ...nextRule
     })
@@ -684,6 +748,66 @@ function ResponsiveBehaviorPanel({
               />
             </div>
           )}
+
+          <div class="rounded-lg border border-[#e5e7eb] bg-gray-50 p-2">
+            <p class="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+              Replacement
+            </p>
+
+            <LayerSegmentedControl
+              value={isReplacementEnabled ? "hamburger" : "off"}
+              options={[
+                { value: "off", label: "Off" },
+                { value: "hamburger", label: "Hamburger" }
+              ]}
+              onChange={(value) => {
+                if (value === "off") {
+                  onReplacementChange(undefined)
+                  return
+                }
+
+                onReplacementChange(createResponsiveReplacementRule(globalRules))
+              }}
+            />
+
+            {isReplacementEnabled && (
+              <div class="mt-2 space-y-2">
+                <LayerSegmentedControl
+                  value={replacement.trigger}
+                  options={[
+                    { value: "auto", label: "Auto" },
+                    { value: "always", label: "Always" },
+                    { value: "never", label: "Never" }
+                  ]}
+                  onChange={(trigger) => updateReplacement({ trigger })}
+                />
+
+                <div class="grid grid-cols-3 gap-2">
+                  <LayerNumberField
+                    label="Max width"
+                    value={replacement.breakpoint}
+                    min={240}
+                    max={1600}
+                    onChange={(breakpoint) => updateReplacement({ breakpoint })}
+                  />
+                  <LayerNumberField
+                    label="W"
+                    value={replacement.width}
+                    min={16}
+                    max={240}
+                    onChange={(width) => updateReplacement({ width })}
+                  />
+                  <LayerNumberField
+                    label="H"
+                    value={replacement.height}
+                    min={16}
+                    max={240}
+                    onChange={(height) => updateReplacement({ height })}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>
@@ -698,6 +822,17 @@ function createResponsiveNodeRule(globalRules: LayoutRulesState): ResponsiveNode
     rowToColumnBreakpoint: globalRules.rowToColumnBreakpoint,
     stackGap: globalRules.stackGap,
     stackAlignment: globalRules.stackAlignment
+  }
+}
+
+function createResponsiveReplacementRule(globalRules: LayoutRulesState): ResponsiveReplacementRule {
+  return {
+    enabled: true,
+    preset: "hamburger",
+    trigger: "auto",
+    breakpoint: globalRules.rowToColumnBreakpoint,
+    width: 44,
+    height: 44
   }
 }
 

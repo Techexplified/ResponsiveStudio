@@ -6,6 +6,12 @@ import type { FigmaSerializedFrame } from "../frameSchema"
 
 export type TargetDevice = "mobile" | "tablet" | "desktop" | "custom"
 
+const targetDeviceWidths: Record<Exclude<TargetDevice, "custom">, number> = {
+  mobile: 375,
+  tablet: 768,
+  desktop: 1440
+}
+
 export type ConversionOption = {
   id: string
   label: string
@@ -51,6 +57,13 @@ export function createDefaultConversionOptions(): ConversionOption[] {
   ]
 }
 
+export function getTargetDeviceWidth(targetDevice: TargetDevice, sourceWidth: number): number {
+  if (targetDevice === "custom") {
+    return Math.max(1, Math.round(sourceWidth))
+  }
+
+  return targetDeviceWidths[targetDevice]
+}
 
 export default function ResponsiveSidebar({
   importedFrame,
@@ -58,12 +71,8 @@ export default function ResponsiveSidebar({
   jsonImportError,
   isJsonImportedFrame,
   targetDevice,
-  sourceWidth,
-  screenWidth,
   layoutRules,
   onTargetDeviceChange,
-  onSourceWidthChange,
-  onScreenWidthChange,
   onLayoutRulesChange,
   onClearFrame,
   onImportJson,
@@ -74,12 +83,8 @@ export default function ResponsiveSidebar({
   jsonImportError: string
   isJsonImportedFrame: boolean
   targetDevice: TargetDevice
-  sourceWidth: string
-  screenWidth: string
   layoutRules: LayoutRulesState
   onTargetDeviceChange: (value: TargetDevice) => void
-  onSourceWidthChange: (value: string) => void
-  onScreenWidthChange: (value: string) => void
   onLayoutRulesChange: (value: LayoutRulesState) => void
   onClearFrame: () => void
   onImportJson: (value: string) => boolean
@@ -113,10 +118,16 @@ export default function ResponsiveSidebar({
   }
 
   function generateResponsiveFrame() {
+    if (importedFrame == null) {
+      return
+    }
+
+    const importedWidth = Math.max(1, Math.round(importedFrame.geometry.width))
+    const targetWidth = getTargetDeviceWidth(targetDevice, importedWidth)
     const payload = {
       targetDevice,
-      sourceWidth: Number(sourceWidth),
-      screenWidth: Number(screenWidth),
+      sourceWidth: importedWidth,
+      screenWidth: targetWidth,
       sourceFrame: isJsonImportedFrame ? null : importedFrame,
       layoutRules,
       options
@@ -139,7 +150,7 @@ export default function ResponsiveSidebar({
             type: "create-export-frame-from-json",
             payload: {
               frame: importedFrame,
-              screenWidth: Number(screenWidth),
+              screenWidth: targetWidth,
               layoutRules
             }
           }
@@ -180,25 +191,11 @@ export default function ResponsiveSidebar({
           />
         )}
 
-        <WidthInput
-          className="mt-4"
-          label="Imported Width"
-          value={sourceWidth}
-          onChange={onSourceWidthChange}
-          disabled={importedFrame == null}
-        />
-
         <StepTitle index={2} title="Target Device" className="mt-7" />
 
         <DeviceSelector
           value={targetDevice}
           onChange={onTargetDeviceChange}
-        />
-
-        <WidthInput
-          label="Reference Width"
-          value={screenWidth}
-          onChange={onScreenWidthChange}
         />
 
         <StepTitle index={3} title="Layout Rules" className="mt-7" />
@@ -225,9 +222,9 @@ export default function ResponsiveSidebar({
         <button
           type="button"
           onClick={generateResponsiveFrame}
-          disabled={importedFrame == null || !isValidWidth(sourceWidth) || !isValidWidth(screenWidth)}
+          disabled={importedFrame == null}
           class={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition ${
-            importedFrame == null || !isValidWidth(sourceWidth) || !isValidWidth(screenWidth)
+            importedFrame == null
               ? "cursor-not-allowed bg-gray-200 text-gray-400"
               : "bg-[#0f766e] text-white hover:bg-[#115e59]"
           }`}
@@ -472,50 +469,6 @@ function DeviceSelector({
       })}
     </div>
   )
-}
-
-function WidthInput({
-  label,
-  value,
-  onChange,
-  disabled = false,
-  className = "mt-4"
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  disabled?: boolean
-  className?: string
-}) {
-  return (
-    <div class={className}>
-      <label class="mb-2 block text-xs font-semibold text-gray-700">
-        {label}
-      </label>
-
-      <div class="flex gap-2">
-        <input
-          type="number"
-          min="1"
-          value={value}
-          disabled={disabled}
-          onInput={(event) => onChange(event.currentTarget.value)}
-          class="h-10 min-w-0 flex-1 rounded-xl border border-[#e5e7eb] bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10 disabled:bg-gray-50 disabled:text-gray-400"
-        />
-
-        <div class="flex h-10 w-14 items-center justify-center rounded-xl border border-[#e5e7eb] bg-gray-50 text-xs font-semibold text-gray-500">
-          px
-        </div>
-      </div>
-
-    </div>
-  )
-}
-
-function isValidWidth(value: string): boolean {
-  const numberValue = Number(value)
-
-  return Number.isFinite(numberValue) && numberValue > 0
 }
 
 function OptionRow({

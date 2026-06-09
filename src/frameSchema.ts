@@ -20,6 +20,15 @@ export type ResponsiveNodeRule = {
   stackAlignment: ResponsiveStackAlignment
 }
 
+export type ResponsiveReplacementRule = {
+  enabled: boolean
+  preset: "hamburger"
+  trigger: ResponsiveConversionMode
+  breakpoint: number
+  width: number
+  height: number
+}
+
 export type SerializedSpacing = {
   top: number
   right: number
@@ -39,6 +48,7 @@ export type FigmaSerializedNodeV1 = {
     acceptsChildren?: boolean
     createdByUser?: boolean
     nodeRule?: ResponsiveNodeRule
+    replacement?: ResponsiveReplacementRule
   }
   visible: boolean
   locked: boolean

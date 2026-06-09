@@ -29,11 +29,7 @@ export default function ExportFramePanel({
         exportType: "responsive-frame-plan",
         appliedAt: snapshot.appliedAt,
         target: {
-          device: snapshot.settings.targetDevice,
-          referenceWidth: snapshot.settings.screenWidth
-        },
-        source: {
-          importedWidth: snapshot.settings.sourceWidth
+          device: snapshot.settings.targetDevice
         },
         appliedOptions: snapshot.settings.options.filter((option) => option.enabled),
         root: normalizedFrame?.root
@@ -82,8 +78,6 @@ export default function ExportFramePanel({
           <section class="border-b border-[#e5e7eb] p-5">
             <div class="grid grid-cols-2 gap-3">
               <SummaryItem label="Target" value={snapshot.settings.targetDevice} />
-              <SummaryItem label="Reference" value={`${snapshot.settings.screenWidth}px`} />
-              <SummaryItem label="Imported" value={`${snapshot.settings.sourceWidth}px`} />
               <SummaryItem label="Source" value={snapshot.frame.name} />
               <SummaryItem label="Children" value={String(snapshot.frame.children.length)} />
             </div>

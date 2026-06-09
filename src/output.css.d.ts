@@ -77,8 +77,11 @@ declare const styles: {
   readonly "cursor-pointer": string;
   readonly "disabled:bg-gray-100": string;
   readonly "disabled:bg-gray-50": string;
+  readonly "disabled:cursor-not-allowed": string;
+  readonly "disabled:opacity-40": string;
   readonly "disabled:text-gray-400": string;
   readonly "duration-300": string;
+  readonly "enabled:hover:bg-gray-50": string;
   readonly "fixed": string;
   readonly "flex": string;
   readonly "flex-1": string;
@@ -189,6 +192,9 @@ declare const styles: {
   readonly "left-0": string;
   readonly "max-h-[45vh]": string;
   readonly "max-h-[520px]": string;
+  readonly "max-h-[55%]": string;
+  readonly "max-h-[72%]": string;
+  readonly "max-h-[calc(55vh-44px)]": string;
   readonly "max-h-full": string;
   readonly "max-w-sm": string;
   readonly "max-w-xs": string;
@@ -199,6 +205,7 @@ declare const styles: {
   readonly "md:flex": string;
   readonly "min-h-0": string;
   readonly "min-h-12": string;
+  readonly "min-h-24": string;
   readonly "min-h-8": string;
   readonly "min-h-9": string;
   readonly "min-h-[230px]": string;
@@ -232,6 +239,7 @@ declare const styles: {
   readonly "overflow-auto": string;
   readonly "overflow-hidden": string;
   readonly "overflow-visible": string;
+  readonly "overscroll-contain": string;
   readonly "p-1": string;
   readonly "p-1.5": string;
   readonly "p-2": string;
@@ -240,6 +248,7 @@ declare const styles: {
   readonly "p-5": string;
   readonly "p-6": string;
   readonly "pb-12": string;
+  readonly "pb-4": string;
   readonly "pl-[var(--layer-indent)]": string;
   readonly "pointer-events-none": string;
   readonly "pr-2": string;
@@ -363,6 +372,7 @@ declare const styles: {
   readonly "w-7": string;
   readonly "w-72": string;
   readonly "w-8": string;
+  readonly "w-80": string;
   readonly "w-9": string;
   readonly "w-[360px]": string;
   readonly "w-[420px]": string;

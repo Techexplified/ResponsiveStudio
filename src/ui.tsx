@@ -6,6 +6,7 @@ import ExportFramePanel, { type ExportFrameSnapshot } from "./components/ExportF
 import { defaultLayoutRules, type LayoutRulesState } from "./components/LayoutRules"
 import ResponsiveSidebar, {
   createDefaultConversionOptions,
+  getTargetDeviceWidth,
   type ConversionOption,
   type ResponsiveGenerationSettings,
   type TargetDevice
@@ -19,8 +20,6 @@ function Plugin() {
   const [frameSource, setFrameSource] = useState<"figma" | "json" | null>(null)
   const [importError, setImportError] = useState("")
   const [targetDevice, setTargetDevice] = useState<TargetDevice>("mobile")
-  const [sourceWidth, setSourceWidth] = useState("")
-  const [screenWidth, setScreenWidth] = useState("")
   const [layoutRules, setLayoutRules] = useState<LayoutRulesState>(defaultLayoutRules)
   const [exportSnapshot, setExportSnapshot] = useState<ExportFrameSnapshot | null>(null)
   const [isExportPanelOpen, setIsExportPanelOpen] = useState(false)
@@ -31,8 +30,6 @@ function Plugin() {
   function clearImportedFrame() {
     setImportedFrame(null)
     setFrameSource(null)
-    setSourceWidth("")
-    setScreenWidth("")
     setImportError("")
     setJsonImportError("")
     setUndoStack([])
@@ -80,18 +77,23 @@ function Plugin() {
   }
 
   function syncExportSnapshotFrame(nextFrame: FigmaSerializedFrame) {
+    const importedWidth = getImportedFrameWidth(nextFrame)
+
     setExportSnapshot((currentSnapshot) => currentSnapshot == null
       ? null
       : {
           ...currentSnapshot,
+          settings: {
+            ...currentSnapshot.settings,
+            sourceWidth: importedWidth,
+            screenWidth: getTargetDeviceWidth(currentSnapshot.settings.targetDevice, importedWidth)
+          },
           frame: cloneFrame(nextFrame)
         })
   }
 
   function handleGenerate(settings: ResponsiveGenerationSettings) {
     setTargetDevice(settings.targetDevice)
-    setSourceWidth(String(settings.sourceWidth))
-    setScreenWidth(String(settings.screenWidth))
     setLayoutRules(settings.layoutRules)
 
     if (importedFrame == null) {
@@ -115,9 +117,9 @@ function Plugin() {
       return false
     }
 
-    const importedWidth = result.sourceWidth ?? Math.round(result.frame.geometry.width)
-    const referenceWidth = result.screenWidth ?? importedWidth
     const nextTargetDevice = result.targetDevice ?? targetDevice
+    const importedWidth = getImportedFrameWidth(result.frame)
+    const referenceWidth = getTargetDeviceWidth(nextTargetDevice, importedWidth)
     const nextLayoutRules = result.layoutRules ?? layoutRules
     const nextOptions = result.options ?? createDefaultConversionOptions()
     const settings: ResponsiveGenerationSettings = {
@@ -136,8 +138,6 @@ function Plugin() {
     setUndoStack([])
     setRedoStack([])
     setTargetDevice(nextTargetDevice)
-    setSourceWidth(String(importedWidth))
-    setScreenWidth(String(referenceWidth))
     setLayoutRules(nextLayoutRules)
     setExportSnapshot({
       id: `json-import-${Date.now()}`,
@@ -160,12 +160,8 @@ function Plugin() {
       }
 
       if (message.type === "frame-imported") {
-        const importedWidth = String(Math.round(message.payload.geometry.width))
-
         setImportedFrame(message.payload)
         setFrameSource("figma")
-        setSourceWidth(importedWidth)
-        setScreenWidth(importedWidth)
         setImportError("")
         setJsonImportError("")
         setUndoStack([])
@@ -194,12 +190,8 @@ function Plugin() {
         jsonImportError={jsonImportError}
         isJsonImportedFrame={frameSource === "json"}
         targetDevice={targetDevice}
-        sourceWidth={sourceWidth}
-        screenWidth={screenWidth}
         layoutRules={layoutRules}
         onTargetDeviceChange={setTargetDevice}
-        onSourceWidthChange={setSourceWidth}
-        onScreenWidthChange={setScreenWidth}
         onLayoutRulesChange={setLayoutRules}
         onClearFrame={clearImportedFrame}
         onImportJson={importJson}
@@ -208,7 +200,7 @@ function Plugin() {
       <Editor
         frame={importedFrame}
         targetDevice={targetDevice}
-        screenWidth={Number(screenWidth)}
+        screenWidth={getTargetDeviceWidth(targetDevice, getImportedFrameWidth(importedFrame))}
         layoutRules={layoutRules}
         canUndo={undoStack.length > 0}
         canRedo={redoStack.length > 0}
@@ -232,8 +224,6 @@ type JsonImportResult =
       frame: FigmaSerializedFrame
       appliedAt?: string
       targetDevice?: TargetDevice
-      sourceWidth?: number
-      screenWidth?: number
       layoutRules?: LayoutRulesState
       options?: ConversionOption[]
     }
@@ -272,14 +262,11 @@ function parseJsonImport(value: string): JsonImportResult {
 
   const settings = asRecord(root.settings)
   const target = asRecord(root.target)
-  const source = asRecord(root.source)
 
   return {
     frame: denormalizeFigmaJson(frameResult.value),
     appliedAt: readString(root.appliedAt),
     targetDevice: readTargetDevice(settings?.targetDevice ?? target?.device),
-    sourceWidth: readPositiveNumber(settings?.sourceWidth ?? source?.importedWidth),
-    screenWidth: readPositiveNumber(settings?.screenWidth ?? target?.referenceWidth ?? target?.width),
     layoutRules: readLayoutRules(settings?.layoutRules),
     options: readConversionOptions(settings?.options ?? root.appliedOptions)
   }
@@ -291,6 +278,14 @@ function cloneFrame(frame: FigmaSerializedFrame): FigmaSerializedFrame {
 
 function trimHistory(stack: FigmaSerializedFrame[]): FigmaSerializedFrame[] {
   return stack.length > historyLimit ? stack.slice(stack.length - historyLimit) : stack
+}
+
+function getImportedFrameWidth(frame: FigmaSerializedFrame | null): number {
+  if (frame == null) {
+    return 1
+  }
+
+  return Math.max(1, Math.round(frame.geometry.width))
 }
 
 function createExportFrameFromJson(frame: FigmaSerializedFrame, settings: ResponsiveGenerationSettings) {
@@ -395,12 +390,6 @@ function readBoundedNumber(value: unknown, fallback: number, min: number, max: n
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, value))
     : fallback
-}
-
-function readPositiveNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : undefined
 }
 
 function readString(value: unknown): string | undefined {

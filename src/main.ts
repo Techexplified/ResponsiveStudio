@@ -111,6 +111,8 @@ async function generateResponsiveFrame(payload: GenerationPayload) {
   generatedNode.x = sourceNode.x + sourceNode.width + 80
   generatedNode.y = sourceNode.y
 
+  resizeRootGeneratedFrame(generatedNode, referenceWidth)
+
   await applyResponsiveRules(
     generatedNode,
     normalizedPayload,
@@ -138,6 +140,39 @@ async function getGenerationSourceNode(payload: GenerationPayload): Promise<Impo
   return selectedNode != null && isImportableFrameNode(selectedNode)
     ? selectedNode
     : null
+}
+
+function resizeRootGeneratedFrame(node: SceneNode, referenceWidth: number) {
+  setGeneratedRootHorizontalSizing(node)
+
+  if (!canResize(node)) {
+    return
+  }
+
+  const currentHeight = readNumber(node, "height", 1)
+
+  resizeSceneNode(node, referenceWidth, currentHeight)
+}
+
+function setGeneratedRootHorizontalSizing(node: SceneNode) {
+  if ("layoutSizingHorizontal" in node) {
+    node.layoutSizingHorizontal = "FIXED"
+  }
+
+  if (!hasAutoLayout(node)) {
+    return
+  }
+
+  const layoutMode = getCurrentLayoutMode(node)
+
+  if (layoutMode === "HORIZONTAL") {
+    node.primaryAxisSizingMode = "FIXED"
+  } else if (layoutMode === "VERTICAL") {
+    node.counterAxisSizingMode = "FIXED"
+  } else {
+    node.primaryAxisSizingMode = "FIXED"
+    node.counterAxisSizingMode = "FIXED"
+  }
 }
 
 async function createExportFrameFromJson(payload: JsonExportPayload) {
@@ -367,6 +402,7 @@ function arrangeJsonExportChildren(
   const effectiveRules = getEffectiveJsonExportRules(node, layoutRules)
   const convertedLayoutMode = getConvertedJsonExportLayoutMode(node, effectiveRules, reviewWidth)
   const activeLayoutMode = convertedLayoutMode ?? getNativeJsonExportLayoutMode(node)
+  const sourceParentLayoutMode = getNativeJsonExportLayoutMode(node) ?? activeLayoutMode
   const activeRules = convertedLayoutMode == null
     ? getNativeJsonExportLayoutRules(node, effectiveRules)
     : effectiveRules
@@ -376,17 +412,18 @@ function arrangeJsonExportChildren(
   }
 
   if (activeLayoutMode === "HORIZONTAL") {
-    return arrangeJsonExportChildrenHorizontally(node, layoutRules, activeRules, reviewWidth)
+    return arrangeJsonExportChildrenHorizontally(node, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
   }
 
-  return arrangeJsonExportChildrenVertically(node, layoutRules, activeRules, reviewWidth)
+  return arrangeJsonExportChildrenVertically(node, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
 }
 
 function arrangeJsonExportChildrenVertically(
   node: FigmaSerializedNode,
   layoutRules: JsonExportLayoutRules,
   effectiveRules: EffectiveJsonExportRules,
-  reviewWidth: number
+  reviewWidth: number,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
 ): Array<{ node: FigmaSerializedNode }> {
   const padding = node.layout.padding ?? {
     top: 0,
@@ -403,7 +440,8 @@ function arrangeJsonExportChildrenVertically(
       child,
       "horizontal",
       effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
-      "VERTICAL"
+      "VERTICAL",
+      sourceParentLayoutMode
     )
       ? contentWidth
       : Math.min(child.geometry.width, contentWidth)
@@ -419,7 +457,7 @@ function arrangeJsonExportChildrenVertically(
       child,
       childWidth,
       baseHeight: getJsonExportNodeHeight(childForWidth, layoutRules, reviewWidth),
-      fillsHeight: shouldFillJsonExportAxis(child, "vertical", false, "VERTICAL")
+      fillsHeight: shouldFillJsonExportAxis(child, "vertical", false, "VERTICAL", sourceParentLayoutMode)
     }
   })
   const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length
@@ -460,7 +498,8 @@ function arrangeJsonExportChildrenHorizontally(
   node: FigmaSerializedNode,
   _layoutRules: JsonExportLayoutRules,
   effectiveRules: EffectiveJsonExportRules,
-  _reviewWidth: number
+  _reviewWidth: number,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
 ): Array<{ node: FigmaSerializedNode }> {
   const padding = node.layout.padding ?? {
     top: 0,
@@ -474,12 +513,13 @@ function arrangeJsonExportChildrenHorizontally(
   const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1)
   const childLayouts = node.children.map((child) => ({
     child,
-    fillsWidth: shouldFillJsonExportAxis(child, "horizontal", false, "HORIZONTAL"),
+    fillsWidth: shouldFillJsonExportAxis(child, "horizontal", false, "HORIZONTAL", sourceParentLayoutMode),
     childHeight: shouldFillJsonExportAxis(
       child,
       "vertical",
       effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
-      "HORIZONTAL"
+      "HORIZONTAL",
+      sourceParentLayoutMode
     )
       ? contentHeight
       : child.geometry.height
@@ -607,11 +647,25 @@ function shouldFillJsonExportAxis(
   node: FigmaSerializedNode,
   axis: "horizontal" | "vertical",
   defaultFill: boolean,
-  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = null
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = null,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null = parentLayoutMode
 ): boolean {
-  const sizingMode = getJsonExportNodeAxisSizing(node, axis, parentLayoutMode)
+  const sizingMode = getJsonExportNodeAxisSizingForParent(node, axis, parentLayoutMode, sourceParentLayoutMode)
 
   return sizingMode === "FILL" || (sizingMode == null && defaultFill)
+}
+
+function getJsonExportNodeAxisSizingForParent(
+  node: FigmaSerializedNode,
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
+): "FILL" | "HUG" | "FIXED" | null {
+  return getJsonExportNodeAxisSizing(
+    node,
+    getSourceAxisForTargetAxis(axis, parentLayoutMode, sourceParentLayoutMode),
+    sourceParentLayoutMode
+  )
 }
 
 function getJsonExportNodeAxisSizing(
@@ -1050,6 +1104,11 @@ async function applyResponsiveRules(
   const sourceNode = sourceNodeLookup.get(nodePath)
   const effectiveRules = getEffectiveGenerationRules(payload, sourceNode?.responsive?.nodeRule)
 
+  if (sourceNode?.responsive?.replacement != null && isReplacementActive(sourceNode.responsive.replacement, payload.screenWidth)) {
+    applyReplacementToSceneNode(node, sourceNode.responsive.replacement)
+    return
+  }
+
   if (hasAutoLayout(node)) {
     const nextLayoutMode = getConvertedLayoutMode(node, payload, effectiveRules)
 
@@ -1057,6 +1116,15 @@ async function applyResponsiveRules(
       node.layoutMode = nextLayoutMode
       node.itemSpacing = clampNumber(effectiveRules.stackGap, 0, 200)
       node.counterAxisAlignItems = getFigmaCounterAxisAlignment(effectiveRules.stackAlignment)
+    }
+
+    if (isRootResponsiveNode(node)) {
+      const padding = clampNumber(payload.layoutRules.outputPadding, 0, 200)
+      node.paddingTop = padding
+      node.paddingRight = padding
+      node.paddingBottom = padding
+      node.paddingLeft = padding
+      resizeRootGeneratedFrame(node, payload.screenWidth)
     }
 
     const activeLayoutMode = nextLayoutMode ?? getCurrentLayoutMode(node)
@@ -1067,11 +1135,7 @@ async function applyResponsiveRules(
     }
 
     if (isRootResponsiveNode(node)) {
-      const padding = clampNumber(payload.layoutRules.outputPadding, 0, 200)
-      node.paddingTop = padding
-      node.paddingRight = padding
-      node.paddingBottom = padding
-      node.paddingLeft = padding
+      resizeRootGeneratedFrame(node, payload.screenWidth)
     }
   }
 
@@ -1101,7 +1165,7 @@ async function applyResponsiveTextRules(node: TextNode, payload: GenerationPaylo
 
   await loadTextFonts(node)
 
-  const widthScale = clampNumber(payload.screenWidth / sourceWidth, 0.5, 1)
+  const widthScale = clampNumber(payload.screenWidth / sourceWidth, 0.5, 2)
   const scaledSize = node.fontSize * widthScale
   const minimumTextSize = clampNumber(payload.layoutRules.minimumTextSize, 8, 48)
 
@@ -1191,6 +1255,123 @@ function getEffectiveGenerationRules(
   }
 }
 
+function applyReplacementToSceneNode(
+  node: SceneNode,
+  rule: NonNullable<FigmaSerializedNode["responsive"]>["replacement"]
+) {
+  if (rule == null || rule.preset !== "hamburger") {
+    return
+  }
+
+  const width = clampReplacementDimension(rule.width)
+  const height = clampReplacementDimension(rule.height)
+
+  if (hasChildren(node)) {
+    while (node.children.length > 0) {
+      node.children[0].remove()
+    }
+  }
+
+  if ("layoutGrow" in node) {
+    node.layoutGrow = 0
+  }
+
+  if ("layoutAlign" in node) {
+    node.layoutAlign = "INHERIT"
+  }
+
+  if ("layoutSizingHorizontal" in node) {
+    node.layoutSizingHorizontal = "FIXED"
+  }
+
+  if ("layoutSizingVertical" in node) {
+    node.layoutSizingVertical = "FIXED"
+  }
+
+  if (hasAutoLayout(node)) {
+    node.layoutMode = "NONE"
+    node.primaryAxisSizingMode = "FIXED"
+    node.counterAxisSizingMode = "FIXED"
+  }
+
+  resizeSceneNode(node, width, height)
+
+  if ("fills" in node) {
+    node.fills = [createSolidPaint(1, 1, 1)]
+  }
+
+  if ("strokes" in node) {
+    node.strokes = [createSolidPaint(0.15, 0.17, 0.2)]
+  }
+
+  if ("strokeWeight" in node) {
+    node.strokeWeight = 1
+  }
+
+  if ("cornerRadius" in node) {
+    ;(node as SceneNode & { cornerRadius: number }).cornerRadius = 8
+  }
+
+  if (!hasChildren(node)) {
+    return
+  }
+
+  const lineWidth = Math.max(12, Math.min(width - 12, Math.round(width * 0.5)))
+  const lineHeight = Math.max(2, Math.min(4, Math.round(height * 0.08)))
+  const gap = Math.max(4, Math.round(height * 0.12))
+  const totalLineHeight = lineHeight * 3 + gap * 2
+  const startX = Math.max(0, (width - lineWidth) / 2)
+  const startY = Math.max(0, (height - totalLineHeight) / 2)
+
+  for (let index = 0; index < 3; index += 1) {
+    const line = figma.createRectangle()
+
+    line.name = `Hamburger line ${index + 1}`
+    line.x = startX
+    line.y = startY + index * (lineHeight + gap)
+    line.resize(lineWidth, lineHeight)
+    line.fills = [createSolidPaint(0.1, 0.12, 0.16)]
+    line.cornerRadius = 999
+    node.appendChild(line)
+  }
+}
+
+function isReplacementActive(
+  rule: NonNullable<FigmaSerializedNode["responsive"]>["replacement"],
+  screenWidth: number
+): boolean {
+  if (rule == null || rule.enabled !== true || rule.preset !== "hamburger") {
+    return false
+  }
+
+  if (rule.trigger === "always") {
+    return true
+  }
+
+  if (rule.trigger === "never") {
+    return false
+  }
+
+  return screenWidth <= rule.breakpoint
+}
+
+function clampReplacementDimension(value: number): number {
+  return Math.min(240, Math.max(16, Math.round(value)))
+}
+
+function createSolidPaint(r: number, g: number, b: number): SolidPaint {
+  return {
+    type: "SOLID",
+    visible: true,
+    opacity: 1,
+    color: {
+      r,
+      g,
+      b
+    }
+  }
+}
+
 function createSourceNodeLookup(sourceFrame: FigmaSerializedFrame | null): Map<string, FigmaSerializedNode> {
   const sourceNodeLookup = new Map<string, FigmaSerializedNode>()
 
@@ -1239,6 +1420,8 @@ function applyConvertedChildSizing(
     return
   }
 
+  const sourceParentLayoutMode = getSerializedParentLayoutMode(sourceNode) ?? layoutMode
+
   for (let index = 0; index < node.children.length; index += 1) {
     const child = node.children[index]
     const sourceChild = sourceNode?.children[index]
@@ -1247,14 +1430,16 @@ function applyConvertedChildSizing(
       child,
       "horizontal",
       layoutMode === "VERTICAL" && alignment === "stretch",
-      layoutMode
+      layoutMode,
+      sourceParentLayoutMode
     )
     const fillsVertical = shouldFillGeneratedAxis(
       sourceChild,
       child,
       "vertical",
       layoutMode === "HORIZONTAL" && alignment === "stretch",
-      layoutMode
+      layoutMode,
+      sourceParentLayoutMode
     )
     const fillsMainAxis = layoutMode === "HORIZONTAL" ? fillsHorizontal : fillsVertical
     const fillsCrossAxis = layoutMode === "HORIZONTAL" ? fillsVertical : fillsHorizontal
@@ -1270,7 +1455,9 @@ function applyConvertedChildSizing(
     }
 
     if ("layoutSizingHorizontal" in child) {
-      const sizing = fillsHorizontal ? "FILL" : getSerializedAxisSizing(sourceChild, "horizontal")
+      const sizing = fillsHorizontal
+        ? "FILL"
+        : getSerializedAxisSizingForParent(sourceChild, "horizontal", layoutMode, sourceParentLayoutMode)
 
       if (sizing != null) {
         child.layoutSizingHorizontal = sizing
@@ -1278,7 +1465,9 @@ function applyConvertedChildSizing(
     }
 
     if ("layoutSizingVertical" in child) {
-      const sizing = fillsVertical ? "FILL" : getSerializedAxisSizing(sourceChild, "vertical")
+      const sizing = fillsVertical
+        ? "FILL"
+        : getSerializedAxisSizingForParent(sourceChild, "vertical", layoutMode, sourceParentLayoutMode)
 
       if (sizing != null) {
         child.layoutSizingVertical = sizing
@@ -1301,18 +1490,20 @@ function applyResponsiveChildGeometry(
   const contentWidth = Math.max(1, node.width - padding.left - padding.right)
   const contentHeight = Math.max(1, node.height - padding.top - padding.bottom)
   const gap = clampNumber(node.itemSpacing ?? layoutRules.stackGap, 0, 200)
+  const sourceParentLayoutMode = getSerializedParentLayoutMode(sourceNode) ?? layoutMode
 
   if (layoutMode === "VERTICAL") {
-    resizeVerticalLayoutChildren(node, sourceNode, contentWidth, contentHeight, gap)
+    resizeVerticalLayoutChildren(node, sourceNode, sourceParentLayoutMode, contentWidth, contentHeight, gap)
     return
   }
 
-  resizeHorizontalLayoutChildren(node, sourceNode, layoutRules, contentWidth, contentHeight, gap)
+  resizeHorizontalLayoutChildren(node, sourceNode, sourceParentLayoutMode, layoutRules, contentWidth, contentHeight, gap)
 }
 
 function resizeVerticalLayoutChildren(
   node: SceneNode & AutoLayoutMixin & ChildrenMixin,
   sourceNode: FigmaSerializedNode | undefined,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL",
   contentWidth: number,
   contentHeight: number,
   gap: number
@@ -1324,14 +1515,16 @@ function resizeVerticalLayoutChildren(
       child,
       "horizontal",
       true,
-      "VERTICAL"
+      "VERTICAL",
+      sourceParentLayoutMode
     )
     const fillsHeight = shouldFillGeneratedAxis(
       sourceChild,
       child,
       "vertical",
       false,
-      "VERTICAL"
+      "VERTICAL",
+      sourceParentLayoutMode
     )
     const nextWidth = fillsWidth
       ? contentWidth
@@ -1362,6 +1555,7 @@ function resizeVerticalLayoutChildren(
 function resizeHorizontalLayoutChildren(
   node: SceneNode & AutoLayoutMixin & ChildrenMixin,
   sourceNode: FigmaSerializedNode | undefined,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL",
   layoutRules: EffectiveGenerationRules,
   contentWidth: number,
   contentHeight: number,
@@ -1377,14 +1571,16 @@ function resizeHorizontalLayoutChildren(
         child,
         "horizontal",
         false,
-        "HORIZONTAL"
+        "HORIZONTAL",
+        sourceParentLayoutMode
       ),
       fillsHeight: shouldFillGeneratedAxis(
         sourceChild,
         child,
         "vertical",
         layoutRules.stackAlignment === "stretch",
-        "HORIZONTAL"
+        "HORIZONTAL",
+        sourceParentLayoutMode
       )
     }
   })
@@ -1443,22 +1639,24 @@ function shouldFillGeneratedAxis(
   fallbackNode: SceneNode,
   axis: "horizontal" | "vertical",
   defaultFill: boolean,
-  parentLayoutMode: "HORIZONTAL" | "VERTICAL"
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" = parentLayoutMode
 ): boolean {
-  const serializedSizing = getSerializedAxisSizing(sourceNode, axis)
+  const sourceAxis = getSourceAxisForTargetAxis(axis, parentLayoutMode, sourceParentLayoutMode)
+  const serializedSizing = getSerializedAxisSizing(sourceNode, sourceAxis)
 
   if (serializedSizing != null) {
     return serializedSizing === "FILL"
   }
 
-  if (sourceNode?.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+  if (sourceNode?.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(sourceParentLayoutMode, sourceAxis)) {
     return true
   }
 
   if (
     typeof sourceNode?.layout.layoutGrow === "number" &&
     sourceNode.layout.layoutGrow > 0 &&
-    axisMatchesPrimaryParentAxis(parentLayoutMode, axis)
+    axisMatchesPrimaryParentAxis(sourceParentLayoutMode, sourceAxis)
   ) {
     return true
   }
@@ -1503,6 +1701,26 @@ function getSerializedAxisSizing(
   return null
 }
 
+function getSerializedAxisSizingForParent(
+  node: FigmaSerializedNode | undefined,
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
+): "FILL" | "HUG" | "FIXED" | null {
+  return getSerializedAxisSizing(
+    node,
+    getSourceAxisForTargetAxis(axis, parentLayoutMode, sourceParentLayoutMode)
+  )
+}
+
+function getSerializedParentLayoutMode(
+  node: FigmaSerializedNode | undefined
+): "HORIZONTAL" | "VERTICAL" | null {
+  return node?.layout.layoutMode === "HORIZONTAL" || node?.layout.layoutMode === "VERTICAL"
+    ? node.layout.layoutMode
+    : null
+}
+
 function getSceneAxisSizing(
   node: SceneNode,
   axis: "horizontal" | "vertical",
@@ -1545,6 +1763,35 @@ function axisMatchesCrossAxis(
   return axis === "horizontal"
     ? parentLayoutMode === "VERTICAL"
     : parentLayoutMode === "HORIZONTAL"
+}
+
+function getSourceAxisForTargetAxis(
+  axis: "horizontal" | "vertical",
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
+  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
+): "horizontal" | "vertical" {
+  if (
+    parentLayoutMode == null ||
+    sourceParentLayoutMode == null ||
+    parentLayoutMode === sourceParentLayoutMode
+  ) {
+    return axis
+  }
+
+  return axisMatchesPrimaryParentAxis(parentLayoutMode, axis)
+    ? getParentAxis(sourceParentLayoutMode, "primary")
+    : getParentAxis(sourceParentLayoutMode, "cross")
+}
+
+function getParentAxis(
+  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
+  role: "primary" | "cross"
+): "horizontal" | "vertical" {
+  if (role === "primary") {
+    return parentLayoutMode === "HORIZONTAL" ? "horizontal" : "vertical"
+  }
+
+  return parentLayoutMode === "HORIZONTAL" ? "vertical" : "horizontal"
 }
 
 function isSceneStretchedOnAxis(

@@ -541,7 +541,7 @@ export function getChildrenBounds(children: FigmaSerializedNode[]): NodeBounds |
   }
 }
 
-function createEditorGeometry(
+export function createEditorGeometry(
   x: number,
   y: number,
   width: number,

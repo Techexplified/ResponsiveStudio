@@ -1125,6 +1125,7 @@ function readResponsive(
   const acceptsChildren = readOptionalBoolean(record.acceptsChildren, `${path}.acceptsChildren`, issues)
   const createdByUser = readOptionalBoolean(record.createdByUser, `${path}.createdByUser`, issues)
   const nodeRule = readResponsiveNodeRule(record.nodeRule, `${path}.nodeRule`, issues)
+  const replacement = readResponsiveReplacementRule(record.replacement, `${path}.replacement`, issues)
 
   if (isVirtualGroup != null) {
     responsive.isVirtualGroup = isVirtualGroup
@@ -1148,6 +1149,10 @@ function readResponsive(
 
   if (nodeRule != null) {
     responsive.nodeRule = nodeRule
+  }
+
+  if (replacement != null) {
+    responsive.replacement = replacement
   }
 
   return responsive
@@ -1223,6 +1228,69 @@ function readResponsiveNodeRule(
     stackGap,
     stackAlignment
   } as FigmaSerializedNodeV1["responsive"] extends { nodeRule?: infer T } ? T : never
+}
+
+function readResponsiveReplacementRule(
+  input: unknown,
+  path: string,
+  issues: ValidationIssue[]
+): FigmaSerializedNodeV1["responsive"] extends { replacement?: infer T } ? T : never | undefined {
+  if (input == null) {
+    return undefined
+  }
+
+  const record = asRecord(input)
+
+  if (record == null) {
+    issues.push({
+      path,
+      message: "Expected responsive replacement object."
+    })
+    return undefined
+  }
+
+  const enabled = readRequiredBoolean(record.enabled, `${path}.enabled`, issues)
+  const preset = record.preset === "hamburger" ? "hamburger" : null
+  const trigger = record.trigger === "always" || record.trigger === "never" || record.trigger === "auto"
+    ? record.trigger
+    : null
+  const breakpoint = readRequiredNumber(record.breakpoint, `${path}.breakpoint`, issues)
+  const width = readRequiredNumber(record.width, `${path}.width`, issues)
+  const height = readRequiredNumber(record.height, `${path}.height`, issues)
+
+  if (preset == null) {
+    issues.push({
+      path: `${path}.preset`,
+      message: "Expected hamburger."
+    })
+  }
+
+  if (trigger == null) {
+    issues.push({
+      path: `${path}.trigger`,
+      message: "Expected auto, always, or never."
+    })
+  }
+
+  if (
+    enabled == null ||
+    preset == null ||
+    trigger == null ||
+    breakpoint == null ||
+    width == null ||
+    height == null
+  ) {
+    return undefined
+  }
+
+  return {
+    enabled,
+    preset,
+    trigger,
+    breakpoint,
+    width,
+    height
+  } as FigmaSerializedNodeV1["responsive"] extends { replacement?: infer T } ? T : never
 }
 
 function readStyles(
