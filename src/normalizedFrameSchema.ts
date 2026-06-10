@@ -1254,6 +1254,9 @@ function readResponsiveReplacementRule(
   const trigger = record.trigger === "always" || record.trigger === "never" || record.trigger === "auto"
     ? record.trigger
     : null
+  const sizeSource = record.sizeSource === "width" || record.sizeSource === "height" || record.sizeSource === "custom"
+    ? record.sizeSource
+    : undefined
   const breakpoint = readRequiredNumber(record.breakpoint, `${path}.breakpoint`, issues)
   const width = readRequiredNumber(record.width, `${path}.width`, issues)
   const height = readRequiredNumber(record.height, `${path}.height`, issues)
@@ -1288,6 +1291,7 @@ function readResponsiveReplacementRule(
     preset,
     trigger,
     breakpoint,
+    sizeSource,
     width,
     height
   } as FigmaSerializedNodeV1["responsive"] extends { replacement?: infer T } ? T : never

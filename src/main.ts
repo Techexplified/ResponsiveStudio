@@ -106,20 +106,23 @@ async function generateResponsiveFrame(payload: GenerationPayload) {
     sourceWidth,
     screenWidth: referenceWidth
   }
-  const generatedNode = sourceNode.clone()
+  const sourceFrame = payload.sourceFrame ?? serializeFrame(sourceNode)
+  const materializedFrame = materializeExportPreviewFrame({
+    frame: sourceFrame,
+    screenWidth: referenceWidth,
+    layoutRules: normalizedPayload.layoutRules
+  })
+  const generatedNode = await createSceneNodeFromSerializedNode(materializedFrame, true)
+
+  if (!isImportableFrameNode(generatedNode)) {
+    figma.notify("Generated responsive output must resolve to a frame.")
+    return
+  }
+
   generatedNode.name = `${sourceNode.name} / ${getDeviceLabel(payload.targetDevice)}`
   generatedNode.x = sourceNode.x + sourceNode.width + 80
   generatedNode.y = sourceNode.y
-
-  resizeRootGeneratedFrame(generatedNode, referenceWidth)
-
-  await applyResponsiveRules(
-    generatedNode,
-    normalizedPayload,
-    sourceWidth,
-    createSourceNodeLookup(payload.sourceFrame),
-    ""
-  )
+  figma.currentPage.appendChild(generatedNode)
 
   figma.currentPage.selection = [generatedNode]
   figma.viewport.scrollAndZoomIntoView([generatedNode])
@@ -143,7 +146,7 @@ async function getGenerationSourceNode(payload: GenerationPayload): Promise<Impo
 }
 
 function resizeRootGeneratedFrame(node: SceneNode, referenceWidth: number) {
-  setGeneratedRootHorizontalSizing(node)
+  setGeneratedRootSizing(node)
 
   if (!canResize(node)) {
     return
@@ -152,11 +155,16 @@ function resizeRootGeneratedFrame(node: SceneNode, referenceWidth: number) {
   const currentHeight = readNumber(node, "height", 1)
 
   resizeSceneNode(node, referenceWidth, currentHeight)
+  setGeneratedRootSizing(node)
 }
 
-function setGeneratedRootHorizontalSizing(node: SceneNode) {
+function setGeneratedRootSizing(node: SceneNode) {
   if ("layoutSizingHorizontal" in node) {
     node.layoutSizingHorizontal = "FIXED"
+  }
+
+  if ("layoutSizingVertical" in node) {
+    node.layoutSizingVertical = "HUG"
   }
 
   if (!hasAutoLayout(node)) {
@@ -167,16 +175,18 @@ function setGeneratedRootHorizontalSizing(node: SceneNode) {
 
   if (layoutMode === "HORIZONTAL") {
     node.primaryAxisSizingMode = "FIXED"
+    node.counterAxisSizingMode = "AUTO"
   } else if (layoutMode === "VERTICAL") {
+    node.primaryAxisSizingMode = "AUTO"
     node.counterAxisSizingMode = "FIXED"
   } else {
     node.primaryAxisSizingMode = "FIXED"
-    node.counterAxisSizingMode = "FIXED"
+    node.counterAxisSizingMode = "AUTO"
   }
 }
 
 async function createExportFrameFromJson(payload: JsonExportPayload) {
-  const materializedFrame = materializeExactExportFrame(payload.frame)
+  const materializedFrame = materializeExportPreviewFrame(payload)
   const exportFrame = await createSceneNodeFromSerializedNode(materializedFrame, true)
 
   if (!isImportableFrameNode(exportFrame)) {
@@ -274,9 +284,24 @@ function createJsonExportReviewGroups(frame: FigmaSerializedFrame, reviewWidth: 
   scale: number
 }> {
   const outerPadding = layoutRules.outputPadding
+  const rootReplacement = materializeJsonExportReplacementNode(frame, reviewWidth)
+
+  if (rootReplacement != null) {
+    return [{
+      node: rootReplacement,
+      x: outerPadding,
+      y: outerPadding,
+      width: rootReplacement.geometry.width,
+      height: rootReplacement.geometry.height,
+      sourceBounds: rootReplacement.geometry,
+      scale: 1
+    }]
+  }
+
   const contentWidth = Math.max(1, reviewWidth - outerPadding * 2)
   const visibleChildren = frame.children
     .filter((child) => child.visible)
+    .map((child) => materializeJsonExportReplacementNode(child, reviewWidth) ?? child)
     .sort((first, second) => first.geometry.y - second.geometry.y || first.geometry.x - second.geometry.x)
   let nextY = outerPadding
 
@@ -364,11 +389,87 @@ function materializeJsonExportNode({
   )
 }
 
+function materializeJsonExportReplacementNode(
+  node: FigmaSerializedNode,
+  reviewWidth: number
+): FigmaSerializedNode | null {
+  const rule = node.responsive?.replacement
+
+  if (!isReplacementActive(rule, reviewWidth)) {
+    return null
+  }
+
+  const { width, height } = getSerializedReplacementDimensions(node, rule)
+  const lineWidth = Math.max(12, Math.min(width - 12, Math.round(width * 0.5)))
+  const lineHeight = Math.max(2, Math.min(4, Math.round(height * 0.08)))
+  const gap = Math.max(4, Math.round(height * 0.12))
+  const totalLineHeight = lineHeight * 3 + gap * 2
+  const startX = Math.max(0, (width - lineWidth) / 2)
+  const startY = Math.max(0, (height - totalLineHeight) / 2)
+
+  return {
+    ...withSerializedGeometry(node, node.geometry.x, node.geometry.y, width, height),
+    name: `${node.name} / hamburger`,
+    layout: getStaticSerializedLayout(node),
+    style: {
+      ...node.style,
+      fills: [createSerializedSolidPaint(1, 1, 1)],
+      strokes: [createSerializedSolidPaint(0.15, 0.17, 0.2)],
+      strokeWeight: 1,
+      cornerRadius: 8
+    },
+    text: undefined,
+    children: [0, 1, 2].map((index) => ({
+      id: `${node.id}-hamburger-line-${index}`,
+      name: `Hamburger line ${index + 1}`,
+      type: "RECTANGLE",
+      visible: true,
+      locked: false,
+      geometry: createSerializedGeometry(
+        startX,
+        startY + index * (lineHeight + gap),
+        lineWidth,
+        lineHeight
+      ),
+      layout: {
+        isAutoLayout: false,
+        layoutMode: "NONE",
+        layoutSizingHorizontal: "FIXED",
+        layoutSizingVertical: "FIXED"
+      },
+      style: {
+        fills: [createSerializedSolidPaint(0.1, 0.12, 0.16)],
+        cornerRadius: 999
+      },
+      children: []
+    }))
+  }
+}
+
+function createSerializedSolidPaint(r: number, g: number, b: number): FigmaJsonValue {
+  return {
+    type: "SOLID",
+    visible: true,
+    opacity: 1,
+    color: {
+      r,
+      g,
+      b
+    }
+  }
+}
+
 function getJsonExportNodeHeight(
   node: FigmaSerializedNode,
   layoutRules: JsonExportLayoutRules,
   reviewWidth: number
 ): number {
+  const replacementNode = materializeJsonExportReplacementNode(node, reviewWidth)
+
+  if (replacementNode != null) {
+    return replacementNode.geometry.height
+  }
+
   if (node.children.length === 0) {
     return node.geometry.height
   }
@@ -399,23 +500,27 @@ function arrangeJsonExportChildren(
   layoutRules: JsonExportLayoutRules,
   reviewWidth: number
 ): Array<{ node: FigmaSerializedNode }> {
-  const effectiveRules = getEffectiveJsonExportRules(node, layoutRules)
-  const convertedLayoutMode = getConvertedJsonExportLayoutMode(node, effectiveRules, reviewWidth)
-  const activeLayoutMode = convertedLayoutMode ?? getNativeJsonExportLayoutMode(node)
-  const sourceParentLayoutMode = getNativeJsonExportLayoutMode(node) ?? activeLayoutMode
+  const layoutNode = {
+    ...node,
+    children: node.children.map((child) => materializeJsonExportReplacementNode(child, reviewWidth) ?? child)
+  }
+  const effectiveRules = getEffectiveJsonExportRules(layoutNode, layoutRules)
+  const convertedLayoutMode = getConvertedJsonExportLayoutMode(layoutNode, effectiveRules, reviewWidth)
+  const activeLayoutMode = convertedLayoutMode ?? getNativeJsonExportLayoutMode(layoutNode)
+  const sourceParentLayoutMode = getNativeJsonExportLayoutMode(layoutNode) ?? activeLayoutMode
   const activeRules = convertedLayoutMode == null
-    ? getNativeJsonExportLayoutRules(node, effectiveRules)
+    ? getNativeJsonExportLayoutRules(layoutNode, effectiveRules)
     : effectiveRules
 
   if (activeLayoutMode == null) {
-    return node.children.map((child) => ({ node: child }))
+    return layoutNode.children.map((child) => ({ node: child }))
   }
 
   if (activeLayoutMode === "HORIZONTAL") {
-    return arrangeJsonExportChildrenHorizontally(node, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
+    return arrangeJsonExportChildrenHorizontally(layoutNode, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
   }
 
-  return arrangeJsonExportChildrenVertically(node, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
+  return arrangeJsonExportChildrenVertically(layoutNode, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode)
 }
 
 function arrangeJsonExportChildrenVertically(
@@ -431,10 +536,8 @@ function arrangeJsonExportChildrenVertically(
     bottom: 0,
     left: 0
   }
-  let nextY = padding.top
   const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right)
   const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom)
-  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1)
   const childLayouts = node.children.map((child) => {
     const childWidth = shouldFillJsonExportAxis(
       child,
@@ -460,24 +563,29 @@ function arrangeJsonExportChildrenVertically(
       fillsHeight: shouldFillJsonExportAxis(child, "vertical", false, "VERTICAL", sourceParentLayoutMode)
     }
   })
+  const justify = getJsonExportMainAxisAlign(node)
+  const align = getJsonExportCrossAxisAlign(node, effectiveRules)
+  const baseGap = effectiveRules.stackGap
+  const baseGapTotal = baseGap * Math.max(0, childLayouts.length - 1)
   const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length
   const fixedHeightTotal = childLayouts.reduce((total, child) => {
     return child.fillsHeight ? total : total + child.baseHeight
   }, 0)
   const fillHeight = fillHeightCount === 0
     ? 0
-    : Math.max(1, (contentHeight - totalGap - fixedHeightTotal) / fillHeightCount)
+    : Math.max(1, (contentHeight - baseGapTotal - fixedHeightTotal) / fillHeightCount)
+  const totalChildrenHeight = childLayouts.reduce((total, child) => {
+    return total + (child.fillsHeight ? fillHeight : child.baseHeight)
+  }, 0)
+  const mainUsed = totalChildrenHeight + baseGapTotal
+  const dynamicGap = getJsonExportDynamicMainAxisGap(justify, baseGap, contentHeight, totalChildrenHeight, childLayouts.length)
+  let nextY = padding.top + getJsonExportMainAxisOffset(justify, contentHeight, mainUsed)
 
   return childLayouts.map((childLayout) => {
     const child = childLayout.child
     const childWidth = childLayout.childWidth
     const childHeight = childLayout.fillsHeight ? fillHeight : childLayout.baseHeight
-    const childX = getJsonExportStackedChildX(
-      effectiveRules.stackAlignment,
-      padding.left,
-      contentWidth,
-      childWidth
-    )
+    const childX = padding.left + getJsonExportCrossAxisOffset(align, contentWidth, childWidth)
     const nextChild = withSerializedGeometry(
       child,
       childX,
@@ -486,7 +594,7 @@ function arrangeJsonExportChildrenVertically(
       childHeight
     )
 
-    nextY += childHeight + effectiveRules.stackGap
+    nextY += childHeight + dynamicGap
 
     return {
       node: nextChild
@@ -507,10 +615,8 @@ function arrangeJsonExportChildrenHorizontally(
     bottom: 0,
     left: 0
   }
-  let nextX = padding.left
   const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right)
   const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom)
-  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1)
   const childLayouts = node.children.map((child) => ({
     child,
     fillsWidth: shouldFillJsonExportAxis(child, "horizontal", false, "HORIZONTAL", sourceParentLayoutMode),
@@ -524,24 +630,29 @@ function arrangeJsonExportChildrenHorizontally(
       ? contentHeight
       : child.geometry.height
   }))
+  const justify = getJsonExportMainAxisAlign(node)
+  const align = getJsonExportCrossAxisAlign(node, effectiveRules)
+  const baseGap = effectiveRules.stackGap
+  const baseGapTotal = baseGap * Math.max(0, childLayouts.length - 1)
   const fillWidthCount = childLayouts.filter((child) => child.fillsWidth).length
   const fixedWidthTotal = childLayouts.reduce((total, child) => {
     return child.fillsWidth ? total : total + child.child.geometry.width
   }, 0)
   const fillChildWidth = fillWidthCount === 0
     ? 0
-    : Math.max(1, (contentWidth - totalGap - fixedWidthTotal) / fillWidthCount)
+    : Math.max(1, (contentWidth - baseGapTotal - fixedWidthTotal) / fillWidthCount)
+  const totalChildrenWidth = childLayouts.reduce((total, child) => {
+    return total + (child.fillsWidth ? fillChildWidth : child.child.geometry.width)
+  }, 0)
+  const mainUsed = totalChildrenWidth + baseGapTotal
+  const dynamicGap = getJsonExportDynamicMainAxisGap(justify, baseGap, contentWidth, totalChildrenWidth, childLayouts.length)
+  let nextX = padding.left + getJsonExportMainAxisOffset(justify, contentWidth, mainUsed)
 
   return childLayouts.map((childLayout) => {
     const child = childLayout.child
     const childWidth = childLayout.fillsWidth ? fillChildWidth : child.geometry.width
     const childHeight = childLayout.childHeight
-    const childY = getJsonExportInlineChildY(
-      effectiveRules.stackAlignment,
-      padding.top,
-      contentHeight,
-      childHeight
-    )
+    const childY = padding.top + getJsonExportCrossAxisOffset(align, contentHeight, childHeight)
     const nextChild = withSerializedGeometry(
       child,
       nextX,
@@ -550,7 +661,7 @@ function arrangeJsonExportChildrenHorizontally(
       childHeight
     )
 
-    nextX += childWidth + effectiveRules.stackGap
+    nextX += childWidth + dynamicGap
 
     return {
       node: nextChild
@@ -739,30 +850,62 @@ function scaleJsonExportLineHeight(lineHeight: FigmaJsonValue | undefined, scale
   return lineHeight
 }
 
-function getJsonExportStackedChildX(
-  stackAlignment: EffectiveJsonExportRules["stackAlignment"],
-  paddingLeft: number,
-  contentWidth: number,
-  childWidth: number
-): number {
-  if (stackAlignment === "center") {
-    return paddingLeft + Math.max(0, (contentWidth - childWidth) / 2)
-  }
-
-  return paddingLeft
+function getJsonExportMainAxisAlign(node: FigmaSerializedNode): string {
+  return typeof node.layout.primaryAxisAlignItems === "string"
+    ? node.layout.primaryAxisAlignItems
+    : "MIN"
 }
 
-function getJsonExportInlineChildY(
-  stackAlignment: EffectiveJsonExportRules["stackAlignment"],
-  paddingTop: number,
-  contentHeight: number,
-  childHeight: number
-): number {
-  if (stackAlignment === "center") {
-    return paddingTop + Math.max(0, (contentHeight - childHeight) / 2)
+function getJsonExportCrossAxisAlign(node: FigmaSerializedNode, layoutRules: EffectiveJsonExportRules): string {
+  if (typeof node.layout.counterAxisAlignItems === "string") {
+    return node.layout.counterAxisAlignItems
   }
 
-  return paddingTop
+  if (layoutRules.stackAlignment === "center") {
+    return "CENTER"
+  }
+
+  return "MIN"
+}
+
+function getJsonExportDynamicMainAxisGap(
+  justify: string,
+  baseGap: number,
+  mainSize: number,
+  totalChildrenMainSize: number,
+  childCount: number
+): number {
+  return justify === "SPACE_BETWEEN" && childCount > 1
+    ? Math.max(baseGap, (mainSize - totalChildrenMainSize) / (childCount - 1))
+    : baseGap
+}
+
+function getJsonExportMainAxisOffset(justify: string, mainSize: number, mainUsed: number): number {
+  const remaining = Math.max(0, mainSize - mainUsed)
+
+  if (justify === "CENTER") {
+    return remaining / 2
+  }
+
+  if (justify === "MAX") {
+    return remaining
+  }
+
+  return 0
+}
+
+function getJsonExportCrossAxisOffset(align: string, crossSize: number, childCrossSize: number): number {
+  const remaining = Math.max(0, crossSize - childCrossSize)
+
+  if (align === "CENTER" || align === "BASELINE") {
+    return remaining / 2
+  }
+
+  if (align === "MAX") {
+    return remaining
+  }
+
+  return 0
 }
 
 function getStaticSerializedLayout(node: FigmaSerializedNode): FigmaSerializedNode["layout"] {
@@ -775,6 +918,44 @@ function getStaticSerializedLayout(node: FigmaSerializedNode): FigmaSerializedNo
     layoutGrow: 0,
     layoutSizingHorizontal: "FIXED",
     layoutSizingVertical: "FIXED"
+  }
+}
+
+function createSerializedGeometry(
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): FigmaSerializedNode["geometry"] {
+  const safeX = roundLayoutNumber(x)
+  const safeY = roundLayoutNumber(y)
+  const safeWidth = Math.max(1, roundLayoutNumber(width))
+  const safeHeight = Math.max(1, roundLayoutNumber(height))
+  const bounds = createBounds(safeX, safeY, safeWidth, safeHeight)
+
+  return {
+    x: safeX,
+    y: safeY,
+    width: safeWidth,
+    height: safeHeight,
+    rotation: 0,
+    absoluteBounds: bounds,
+    parentRelativeBounds: bounds,
+    rootRelativeBounds: bounds,
+    percentOfRoot: {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      right: 0,
+      bottom: 0
+    },
+    hierarchy: {
+      parentId: null,
+      depth: 0,
+      siblingIndex: 0,
+      siblingCount: 1
+    }
   }
 }
 
@@ -1263,8 +1444,7 @@ function applyReplacementToSceneNode(
     return
   }
 
-  const width = clampReplacementDimension(rule.width)
-  const height = clampReplacementDimension(rule.height)
+  const { width, height } = getSceneReplacementDimensions(node, rule)
 
   if (hasChildren(node)) {
     while (node.children.length > 0) {
@@ -1356,7 +1536,49 @@ function isReplacementActive(
 }
 
 function clampReplacementDimension(value: number): number {
-  return Math.min(240, Math.max(16, Math.round(value)))
+  return Math.min(10000, Math.max(16, Math.round(value)))
+}
+
+function getSerializedReplacementDimensions(
+  node: FigmaSerializedNode,
+  rule: NonNullable<FigmaSerializedNode["responsive"]>["replacement"]
+): {
+  width: number
+  height: number
+} {
+  const sizeSource = rule?.sizeSource ?? "custom"
+  const size = sizeSource === "width"
+    ? node.geometry.width
+    : sizeSource === "height"
+      ? node.geometry.height
+      : rule?.width ?? node.geometry.height
+  const squareSize = clampReplacementDimension(size)
+
+  return {
+    width: squareSize,
+    height: squareSize
+  }
+}
+
+function getSceneReplacementDimensions(
+  node: SceneNode,
+  rule: NonNullable<FigmaSerializedNode["responsive"]>["replacement"]
+): {
+  width: number
+  height: number
+} {
+  const sizeSource = rule?.sizeSource ?? "custom"
+  const size = sizeSource === "width"
+    ? readNumber(node, "width", rule?.width ?? 44)
+    : sizeSource === "height"
+      ? readNumber(node, "height", rule?.height ?? 44)
+      : rule?.width ?? readNumber(node, "height", 44)
+  const squareSize = clampReplacementDimension(size)
+
+  return {
+    width: squareSize,
+    height: squareSize
+  }
 }
 
 function createSolidPaint(r: number, g: number, b: number): SolidPaint {

@@ -26,11 +26,14 @@ declare const styles: {
   readonly "bg-gray-200": string;
   readonly "bg-gray-300": string;
   readonly "bg-gray-50": string;
+  readonly "bg-gray-900": string;
   readonly "bg-green-50": string;
   readonly "bg-green-500": string;
   readonly "bg-red-200": string;
   readonly "bg-red-50": string;
   readonly "bg-red-600": string;
+  readonly "bg-teal-50": string;
+  readonly "bg-teal-700": string;
   readonly "bg-transparent": string;
   readonly "bg-white": string;
   readonly "bg-white/70": string;
@@ -65,6 +68,7 @@ declare const styles: {
   readonly "border-l": string;
   readonly "border-r": string;
   readonly "border-t": string;
+  readonly "border-teal-700": string;
   readonly "border-white": string;
   readonly "border-white/10": string;
   readonly "border-white/80": string;
@@ -80,8 +84,11 @@ declare const styles: {
   readonly "disabled:cursor-not-allowed": string;
   readonly "disabled:opacity-40": string;
   readonly "disabled:text-gray-400": string;
+  readonly "divide-gray-200": string;
+  readonly "divide-x": string;
   readonly "duration-300": string;
   readonly "enabled:hover:bg-gray-50": string;
+  readonly "enabled:hover:bg-teal-800": string;
   readonly "fixed": string;
   readonly "flex": string;
   readonly "flex-1": string;
@@ -165,6 +172,7 @@ declare const styles: {
   readonly "hover:bg-[#ccfbf1]": string;
   readonly "hover:bg-[#ebe6ff]": string;
   readonly "hover:bg-[#f59e0b]": string;
+  readonly "hover:bg-black": string;
   readonly "hover:bg-gray-100": string;
   readonly "hover:bg-gray-50": string;
   readonly "hover:bg-red-50": string;
@@ -190,12 +198,15 @@ declare const styles: {
   readonly "leading-relaxed": string;
   readonly "leading-tight": string;
   readonly "left-0": string;
+  readonly "max-h-[30%]": string;
   readonly "max-h-[45vh]": string;
   readonly "max-h-[520px]": string;
   readonly "max-h-[55%]": string;
   readonly "max-h-[72%]": string;
+  readonly "max-h-[82%]": string;
   readonly "max-h-[calc(55vh-44px)]": string;
   readonly "max-h-full": string;
+  readonly "max-w-full": string;
   readonly "max-w-sm": string;
   readonly "max-w-xs": string;
   readonly "mb-1": string;
@@ -206,10 +217,12 @@ declare const styles: {
   readonly "min-h-0": string;
   readonly "min-h-12": string;
   readonly "min-h-24": string;
+  readonly "min-h-28": string;
   readonly "min-h-8": string;
   readonly "min-h-9": string;
   readonly "min-h-[230px]": string;
   readonly "min-h-[240px]": string;
+  readonly "min-h-[45%]": string;
   readonly "min-h-[470px]": string;
   readonly "min-h-[540px]": string;
   readonly "min-h-full": string;
@@ -228,6 +241,7 @@ declare const styles: {
   readonly "mx-2": string;
   readonly "mx-auto": string;
   readonly "my-4": string;
+  readonly "object-cover": string;
   readonly "opacity-0": string;
   readonly "opacity-100": string;
   readonly "opacity-50": string;
@@ -239,6 +253,8 @@ declare const styles: {
   readonly "overflow-auto": string;
   readonly "overflow-hidden": string;
   readonly "overflow-visible": string;
+  readonly "overflow-x-hidden": string;
+  readonly "overflow-y-auto": string;
   readonly "overscroll-contain": string;
   readonly "p-1": string;
   readonly "p-1.5": string;
@@ -249,6 +265,7 @@ declare const styles: {
   readonly "p-6": string;
   readonly "pb-12": string;
   readonly "pb-4": string;
+  readonly "pb-8": string;
   readonly "pl-[var(--layer-indent)]": string;
   readonly "pointer-events-none": string;
   readonly "pr-2": string;
@@ -305,6 +322,7 @@ declare const styles: {
   readonly "shrink-0": string;
   readonly "space-y-2": string;
   readonly "space-y-3": string;
+  readonly "space-y-4": string;
   readonly "space-y-5": string;
   readonly "sr-only": string;
   readonly "table": string;
@@ -340,6 +358,7 @@ declare const styles: {
   readonly "text-red-700": string;
   readonly "text-right": string;
   readonly "text-sm": string;
+  readonly "text-teal-800": string;
   readonly "text-transparent": string;
   readonly "text-white": string;
   readonly "text-xl": string;

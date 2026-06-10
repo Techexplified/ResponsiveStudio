@@ -5,12 +5,12 @@ import type { LayoutRulesState } from "./LayoutRules"
 import type { TargetDevice } from "./ResponsiveSidebar"
 import ExportPreviewDrawer from "./ExportPreviewDrawer"
 import FramePreview from "./FramePreview"
-import { JsonViewerOverlay, JsonViewerSlider } from "./JsonViewer"
 import LayerPanel from "./LayerPanel"
 
 export type NodeBounds = Pick<FigmaSerializedNode["geometry"], "x" | "y" | "width" | "height">
 
 type EditorProps = {
+  sourceFrame: FigmaSerializedFrame | null
   frame: FigmaSerializedFrame | null
   targetDevice: TargetDevice
   screenWidth: number
@@ -23,6 +23,7 @@ type EditorProps = {
 }
 
 export default function Editor({
+  sourceFrame,
   frame,
   targetDevice,
   screenWidth,
@@ -35,7 +36,7 @@ export default function Editor({
 }: EditorProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(frame?.id ?? null)
   const [isExportPreviewExpanded, setIsExportPreviewExpanded] = useState(true)
-  const [isJsonExpanded, setIsJsonExpanded] = useState(false)
+  const previewFrame = sourceFrame ?? frame
 
   useEffect(() => {
     setSelectedNodeId((currentNodeId) => {
@@ -49,7 +50,7 @@ export default function Editor({
     })
   }, [frame])
 
-  if (frame == null) {
+  if (frame == null || previewFrame == null) {
     return (
       <section class="flex min-w-0 flex-1 items-center justify-center bg-[#f6f7fb] px-6 text-center">
         <div class="max-w-sm">
@@ -57,7 +58,7 @@ export default function Editor({
             Select a frame to begin
           </p>
           <p class="mt-2 text-sm leading-6 text-gray-500">
-            Import a Figma frame or JSON file to inspect and convert its responsive layout.
+            Import a Figma frame to inspect and convert its responsive layout.
           </p>
         </div>
       </section>
@@ -69,10 +70,10 @@ export default function Editor({
       <header class="flex h-20 shrink-0 items-center justify-between border-b border-[#e5e7eb] bg-white px-6">
         <div class="min-w-0">
           <h2 class="truncate text-lg font-bold text-gray-900">
-            {frame.name}
+            {previewFrame.name}
           </h2>
           <p class="mt-1 text-sm text-gray-500">
-            FRAME - {Math.round(frame.geometry.width)} x {Math.round(frame.geometry.height)} px - schema v1
+            FRAME - {Math.round(previewFrame.geometry.width)} x {Math.round(previewFrame.geometry.height)} px - schema v1
           </p>
         </div>
 
@@ -99,7 +100,7 @@ export default function Editor({
       <div class="flex min-h-0 flex-1 overflow-hidden">
         <div class="relative min-h-0 min-w-0 flex-1">
           <FramePreview
-            frame={frame}
+            frame={previewFrame}
             selectedNodeId={selectedNodeId}
             onSelect={setSelectedNodeId}
           />
@@ -115,19 +116,6 @@ export default function Editor({
             onToggle={() => setIsExportPreviewExpanded((current) => !current)}
           />
 
-          <JsonViewerSlider
-            frame={frame}
-            isExpanded={isJsonExpanded}
-            onToggle={() => setIsJsonExpanded((current) => !current)}
-          />
-
-          {isJsonExpanded && (
-            <JsonViewerOverlay
-              frame={frame}
-              onFrameChange={onFrameChange}
-              onClose={() => setIsJsonExpanded(false)}
-            />
-          )}
         </div>
 
         <div class="min-h-0 w-80 shrink-0">

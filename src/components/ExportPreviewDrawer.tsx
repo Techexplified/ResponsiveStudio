@@ -145,7 +145,10 @@ function GeneratedPreview({
     nodeId: string
     clickedAt: number
   } | null>(null)
-  const [viewportWidth, setViewportWidth] = useState(720)
+  const [viewportSize, setViewportSize] = useState({
+    width: 720,
+    height: 520
+  })
   const reviewWidth = Number.isFinite(screenWidth) && screenWidth > 0
     ? screenWidth
     : frame.geometry.width
@@ -155,10 +158,13 @@ function GeneratedPreview({
     Math.min(frame.geometry.height, 760),
     exportGroups.reduce((bottom, group) => Math.max(bottom, group.y + group.height), 0) + 24
   )
-  const availableWidth = Math.max(240, viewportWidth - 48)
-  const fitScale = availableWidth / Math.max(reviewWidth, 1)
-  const minimumReadableScale = targetDevice === "desktop" ? 0.45 : targetDevice === "tablet" ? 0.6 : 0.85
-  const canvasScale = Math.min(1, Math.max(minimumReadableScale, fitScale))
+  const availableWidth = Math.max(240, viewportSize.width - 48)
+  const availableHeight = Math.max(180, viewportSize.height - 92)
+  const fitScale = Math.min(
+    availableWidth / Math.max(reviewWidth, 1),
+    availableHeight / Math.max(reviewHeight, 1)
+  )
+  const canvasScale = Math.min(1, Math.max(0.1, fitScale))
   const canvasWidth = Math.max(1, reviewWidth * canvasScale)
   const canvasHeight = Math.max(1, reviewHeight * canvasScale)
   const isFrameSelected = selectedNodeId === frame.id
@@ -170,25 +176,30 @@ function GeneratedPreview({
       return
     }
 
-    function updateViewportWidth() {
+    function updateViewportSize() {
       const currentScrollArea = scrollAreaRef.current
 
       if (currentScrollArea == null) {
         return
       }
 
-      setViewportWidth(currentScrollArea.getBoundingClientRect().width)
+      const rect = currentScrollArea.getBoundingClientRect()
+
+      setViewportSize({
+        width: rect.width,
+        height: rect.height
+      })
     }
 
-    updateViewportWidth()
+    updateViewportSize()
 
     if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", updateViewportWidth)
+      window.addEventListener("resize", updateViewportSize)
 
-      return () => window.removeEventListener("resize", updateViewportWidth)
+      return () => window.removeEventListener("resize", updateViewportSize)
     }
 
-    const observer = new ResizeObserver(updateViewportWidth)
+    const observer = new ResizeObserver(updateViewportSize)
     observer.observe(scrollArea)
 
     return () => observer.disconnect()
@@ -218,12 +229,12 @@ function GeneratedPreview({
     <section class="flex h-full min-h-0 flex-col bg-[#fbfbfd]">
       <div ref={scrollAreaRef} class="min-h-0 flex-1 overflow-auto p-5">
         <div
-          class="min-h-full"
+          class="flex min-h-full min-w-0 items-center justify-center"
           style={{
-            minWidth: `${canvasWidth + 40}px`
+            minWidth: 0
           }}
         >
-          <div class="mx-auto w-fit">
+          <div class="w-fit max-w-full">
             <div class="mb-3 flex items-center justify-between gap-4 text-xs">
               <div class="flex items-center gap-2">
                 <span class="font-bold text-gray-900">
@@ -653,8 +664,7 @@ function materializeReplacementNode(node: FigmaSerializedNode, reviewWidth: numb
     return null
   }
 
-  const width = clampReplacementDimension(rule.width)
-  const height = clampReplacementDimension(rule.height)
+  const { width, height } = getReplacementDimensions(node, rule)
   const lineWidth = Math.max(12, Math.min(width - 12, Math.round(width * 0.5)))
   const lineHeight = Math.max(2, Math.min(4, Math.round(height * 0.08)))
   const gap = Math.max(4, Math.round(height * 0.12))
@@ -795,7 +805,28 @@ function solidPaint(r: number, g: number, b: number) {
 }
 
 function clampReplacementDimension(value: number): number {
-  return Math.min(240, Math.max(16, Math.round(value)))
+  return Math.min(10000, Math.max(16, Math.round(value)))
+}
+
+function getReplacementDimensions(
+  node: FigmaSerializedNode,
+  rule: NonNullable<FigmaSerializedNode["responsive"]>["replacement"]
+): {
+  width: number
+  height: number
+} {
+  const sizeSource = rule?.sizeSource ?? "custom"
+  const size = sizeSource === "width"
+    ? node.geometry.width
+    : sizeSource === "height"
+      ? node.geometry.height
+      : rule?.width ?? node.geometry.height
+  const squareSize = clampReplacementDimension(size)
+
+  return {
+    width: squareSize,
+    height: squareSize
+  }
 }
 
 function getResponsiveNodeHeight(
@@ -844,6 +875,20 @@ function createExportReviewGroups(frame: FigmaSerializedFrame, reviewWidth: numb
   scale: number
 }> {
   const outerPadding = layoutRules.outputPadding
+  const rootReplacement = materializeReplacementNode(frame, reviewWidth)
+
+  if (rootReplacement != null) {
+    return [{
+      node: rootReplacement,
+      x: outerPadding,
+      y: outerPadding,
+      width: rootReplacement.geometry.width,
+      height: rootReplacement.geometry.height,
+      sourceBounds: rootReplacement.geometry,
+      scale: 1
+    }]
+  }
+
   const contentWidth = Math.max(1, reviewWidth - outerPadding * 2)
   const visibleChildren = frame.children
     .filter((child) => child.visible)
@@ -917,10 +962,8 @@ function arrangeChildrenVertically(
     bottom: 0,
     left: 0
   }
-  let nextY = padding.top
   const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right)
   const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom)
-  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1)
   const childLayouts = node.children.map((child) => {
     const childWidth = shouldFillAxis(
       child,
@@ -946,24 +989,29 @@ function arrangeChildrenVertically(
       fillsHeight: shouldFillAxis(child, "vertical", false, "VERTICAL", sourceParentLayoutMode)
     }
   })
+  const justify = getMainAxisAlign(node)
+  const align = getCrossAxisAlign(node, effectiveRules)
+  const baseGap = effectiveRules.stackGap
+  const baseGapTotal = baseGap * Math.max(0, childLayouts.length - 1)
   const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length
   const fixedHeightTotal = childLayouts.reduce((total, child) => {
     return child.fillsHeight ? total : total + child.baseHeight
   }, 0)
   const fillHeight = fillHeightCount === 0
     ? 0
-    : Math.max(1, (contentHeight - totalGap - fixedHeightTotal) / fillHeightCount)
+    : Math.max(1, (contentHeight - baseGapTotal - fixedHeightTotal) / fillHeightCount)
+  const totalChildrenHeight = childLayouts.reduce((total, child) => {
+    return total + (child.fillsHeight ? fillHeight : child.baseHeight)
+  }, 0)
+  const mainUsed = totalChildrenHeight + baseGapTotal
+  const dynamicGap = getDynamicMainAxisGap(justify, baseGap, contentHeight, totalChildrenHeight, childLayouts.length)
+  let nextY = padding.top + getMainAxisOffset(justify, contentHeight, mainUsed)
 
   return childLayouts.map((childLayout) => {
     const child = childLayout.child
     const childWidth = childLayout.childWidth
     const childHeight = childLayout.fillsHeight ? fillHeight : childLayout.baseHeight
-    const childX = getStackedChildX(
-      effectiveRules.stackAlignment,
-      padding.left,
-      contentWidth,
-      childWidth
-    )
+    const childX = padding.left + getCrossAxisOffset(align, contentWidth, childWidth)
     const nextChild = {
       ...child,
       geometry: {
@@ -975,7 +1023,7 @@ function arrangeChildrenVertically(
       }
     }
 
-    nextY += childHeight + effectiveRules.stackGap
+    nextY += childHeight + dynamicGap
 
     return {
       node: nextChild
@@ -998,10 +1046,8 @@ function arrangeChildrenHorizontally(
     bottom: 0,
     left: 0
   }
-  let nextX = padding.left
   const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right)
   const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom)
-  const totalGap = effectiveRules.stackGap * Math.max(0, node.children.length - 1)
   const childLayouts = node.children.map((child) => ({
     child,
     fillsWidth: shouldFillAxis(child, "horizontal", false, "HORIZONTAL", sourceParentLayoutMode),
@@ -1015,24 +1061,29 @@ function arrangeChildrenHorizontally(
       ? contentHeight
       : child.geometry.height
   }))
+  const justify = getMainAxisAlign(node)
+  const align = getCrossAxisAlign(node, effectiveRules)
+  const baseGap = effectiveRules.stackGap
+  const baseGapTotal = baseGap * Math.max(0, childLayouts.length - 1)
   const fillWidthCount = childLayouts.filter((child) => child.fillsWidth).length
   const fixedWidthTotal = childLayouts.reduce((total, child) => {
     return child.fillsWidth ? total : total + child.child.geometry.width
   }, 0)
   const fillChildWidth = fillWidthCount === 0
     ? 0
-    : Math.max(1, (contentWidth - totalGap - fixedWidthTotal) / fillWidthCount)
+    : Math.max(1, (contentWidth - baseGapTotal - fixedWidthTotal) / fillWidthCount)
+  const totalChildrenWidth = childLayouts.reduce((total, child) => {
+    return total + (child.fillsWidth ? fillChildWidth : child.child.geometry.width)
+  }, 0)
+  const mainUsed = totalChildrenWidth + baseGapTotal
+  const dynamicGap = getDynamicMainAxisGap(justify, baseGap, contentWidth, totalChildrenWidth, childLayouts.length)
+  let nextX = padding.left + getMainAxisOffset(justify, contentWidth, mainUsed)
 
   return childLayouts.map((childLayout) => {
     const child = childLayout.child
     const childWidth = childLayout.fillsWidth ? fillChildWidth : child.geometry.width
     const childHeight = childLayout.childHeight
-    const childY = getInlineChildY(
-      effectiveRules.stackAlignment,
-      padding.top,
-      contentHeight,
-      childHeight
-    )
+    const childY = padding.top + getCrossAxisOffset(align, contentHeight, childHeight)
     const nextChild = {
       ...child,
       geometry: {
@@ -1044,7 +1095,7 @@ function arrangeChildrenHorizontally(
       }
     }
 
-    nextX += childWidth + effectiveRules.stackGap
+    nextX += childWidth + dynamicGap
 
     return {
       node: nextChild
@@ -1052,30 +1103,62 @@ function arrangeChildrenHorizontally(
   })
 }
 
-function getStackedChildX(
-  stackAlignment: EffectiveLayoutRules["stackAlignment"],
-  paddingLeft: number,
-  contentWidth: number,
-  childWidth: number
-): number {
-  if (stackAlignment === "center") {
-    return paddingLeft + Math.max(0, (contentWidth - childWidth) / 2)
-  }
-
-  return paddingLeft
+function getMainAxisAlign(node: FigmaSerializedNode): string {
+  return typeof node.layout.primaryAxisAlignItems === "string"
+    ? node.layout.primaryAxisAlignItems
+    : "MIN"
 }
 
-function getInlineChildY(
-  stackAlignment: EffectiveLayoutRules["stackAlignment"],
-  paddingTop: number,
-  contentHeight: number,
-  childHeight: number
-): number {
-  if (stackAlignment === "center") {
-    return paddingTop + Math.max(0, (contentHeight - childHeight) / 2)
+function getCrossAxisAlign(node: FigmaSerializedNode, layoutRules: EffectiveLayoutRules): string {
+  if (typeof node.layout.counterAxisAlignItems === "string") {
+    return node.layout.counterAxisAlignItems
   }
 
-  return paddingTop
+  if (layoutRules.stackAlignment === "center") {
+    return "CENTER"
+  }
+
+  return "MIN"
+}
+
+function getDynamicMainAxisGap(
+  justify: string,
+  baseGap: number,
+  mainSize: number,
+  totalChildrenMainSize: number,
+  childCount: number
+): number {
+  return justify === "SPACE_BETWEEN" && childCount > 1
+    ? Math.max(baseGap, (mainSize - totalChildrenMainSize) / (childCount - 1))
+    : baseGap
+}
+
+function getMainAxisOffset(justify: string, mainSize: number, mainUsed: number): number {
+  const remaining = Math.max(0, mainSize - mainUsed)
+
+  if (justify === "CENTER") {
+    return remaining / 2
+  }
+
+  if (justify === "MAX") {
+    return remaining
+  }
+
+  return 0
+}
+
+function getCrossAxisOffset(align: string, crossSize: number, childCrossSize: number): number {
+  const remaining = Math.max(0, crossSize - childCrossSize)
+
+  if (align === "CENTER" || align === "BASELINE") {
+    return remaining / 2
+  }
+
+  if (align === "MAX") {
+    return remaining
+  }
+
+  return 0
 }
 
 function getConvertedLayoutMode(

@@ -17,6 +17,7 @@ import { denormalizeFigmaJson, deserializeNormalizedJson } from "./normalizedFra
 
 function Plugin() {
   const [importedFrame, setImportedFrame] = useState<FigmaSerializedFrame | null>(null)
+  const [workingFrame, setWorkingFrame] = useState<FigmaSerializedFrame | null>(null)
   const [frameSource, setFrameSource] = useState<"figma" | "json" | null>(null)
   const [importError, setImportError] = useState("")
   const [targetDevice, setTargetDevice] = useState<TargetDevice>("mobile")
@@ -29,6 +30,7 @@ function Plugin() {
 
   function clearImportedFrame() {
     setImportedFrame(null)
+    setWorkingFrame(null)
     setFrameSource(null)
     setImportError("")
     setJsonImportError("")
@@ -38,26 +40,26 @@ function Plugin() {
     setIsExportPanelOpen(false)
   }
 
-  function changeImportedFrame(nextFrame: FigmaSerializedFrame) {
-    if (importedFrame != null) {
-      setUndoStack((currentStack) => trimHistory([...currentStack, cloneFrame(importedFrame)]))
+  function changeWorkingFrame(nextFrame: FigmaSerializedFrame) {
+    if (workingFrame != null) {
+      setUndoStack((currentStack) => trimHistory([...currentStack, cloneFrame(workingFrame)]))
     }
 
     setRedoStack([])
-    setImportedFrame(nextFrame)
+    setWorkingFrame(nextFrame)
     syncExportSnapshotFrame(nextFrame)
   }
 
   function undoFrameChange() {
-    if (importedFrame == null || undoStack.length === 0) {
+    if (workingFrame == null || undoStack.length === 0) {
       return
     }
 
     const previousFrame = undoStack[undoStack.length - 1]
 
     setUndoStack((currentStack) => currentStack.slice(0, -1))
-    setRedoStack((currentStack) => trimHistory([...currentStack, cloneFrame(importedFrame)]))
-    setImportedFrame(cloneFrame(previousFrame))
+    setRedoStack((currentStack) => trimHistory([...currentStack, cloneFrame(workingFrame)]))
+    setWorkingFrame(cloneFrame(previousFrame))
     syncExportSnapshotFrame(previousFrame)
   }
 
@@ -69,10 +71,10 @@ function Plugin() {
     const nextFrame = redoStack[redoStack.length - 1]
 
     setRedoStack((currentStack) => currentStack.slice(0, -1))
-    if (importedFrame != null) {
-      setUndoStack((currentStack) => trimHistory([...currentStack, cloneFrame(importedFrame)]))
+    if (workingFrame != null) {
+      setUndoStack((currentStack) => trimHistory([...currentStack, cloneFrame(workingFrame)]))
     }
-    setImportedFrame(cloneFrame(nextFrame))
+    setWorkingFrame(cloneFrame(nextFrame))
     syncExportSnapshotFrame(nextFrame)
   }
 
@@ -96,7 +98,7 @@ function Plugin() {
     setTargetDevice(settings.targetDevice)
     setLayoutRules(settings.layoutRules)
 
-    if (importedFrame == null) {
+    if (workingFrame == null) {
       return
     }
 
@@ -104,7 +106,7 @@ function Plugin() {
       id: `export-${Date.now()}`,
       appliedAt: new Date().toISOString(),
       settings,
-      frame: JSON.parse(JSON.stringify(importedFrame)) as FigmaSerializedFrame
+      frame: cloneFrame(workingFrame)
     })
     setIsExportPanelOpen(true)
   }
@@ -131,7 +133,8 @@ function Plugin() {
       options: nextOptions
     }
 
-    setImportedFrame(result.frame)
+    setImportedFrame(cloneFrame(result.frame))
+    setWorkingFrame(cloneFrame(result.frame))
     setFrameSource("json")
     setImportError("")
     setJsonImportError("")
@@ -160,7 +163,8 @@ function Plugin() {
       }
 
       if (message.type === "frame-imported") {
-        setImportedFrame(message.payload)
+        setImportedFrame(cloneFrame(message.payload))
+        setWorkingFrame(cloneFrame(message.payload))
         setFrameSource("figma")
         setImportError("")
         setJsonImportError("")
@@ -186,6 +190,7 @@ function Plugin() {
     <main class="h-screen w-screen overflow-hidden bg-[#f6f7fb] text-[#111827] flex">
       <ResponsiveSidebar
         importedFrame={importedFrame}
+        workingFrame={workingFrame}
         importError={importError}
         jsonImportError={jsonImportError}
         isJsonImportedFrame={frameSource === "json"}
@@ -198,7 +203,8 @@ function Plugin() {
         onGenerate={handleGenerate}
       />
       <Editor
-        frame={importedFrame}
+        sourceFrame={importedFrame}
+        frame={workingFrame}
         targetDevice={targetDevice}
         screenWidth={getTargetDeviceWidth(targetDevice, getImportedFrameWidth(importedFrame))}
         layoutRules={layoutRules}
@@ -206,7 +212,7 @@ function Plugin() {
         canRedo={redoStack.length > 0}
         onUndo={undoFrameChange}
         onRedo={redoFrameChange}
-        onFrameChange={changeImportedFrame}
+        onFrameChange={changeWorkingFrame}
       />
       <ExportFramePanel
         snapshot={exportSnapshot}

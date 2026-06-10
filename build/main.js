@@ -1,1 +1,1265 @@
-var L=Object.defineProperty,xt=Object.defineProperties,At=Object.getOwnPropertyDescriptor,St=Object.getOwnPropertyDescriptors,zt=Object.getOwnPropertyNames,D=Object.getOwnPropertySymbols;var P=Object.prototype.hasOwnProperty,Et=Object.prototype.propertyIsEnumerable;var J=(t,e,i)=>e in t?L(t,e,{enumerable:!0,configurable:!0,writable:!0,value:i}):t[e]=i,x=(t,e)=>{for(var i in e||(e={}))P.call(e,i)&&J(t,i,e[i]);if(D)for(var i of D(e))Et.call(e,i)&&J(t,i,e[i]);return t},A=(t,e)=>xt(t,St(e));var C=(t,e)=>()=>(t&&(e=t(t=0)),e);var Tt=(t,e)=>{for(var i in e)L(t,i,{get:e[i],enumerable:!0})},It=(t,e,i,n)=>{if(e&&typeof e=="object"||typeof e=="function")for(let r of zt(e))!P.call(t,r)&&r!==i&&L(t,r,{get:()=>e[r],enumerable:!(n=At(e,r))||n.enumerable});return t};var Nt=t=>It(L({},"__esModule",{value:!0}),t);function H(t,e){if(typeof __html__=="undefined")throw new Error("No UI defined");let i=`<div id="create-figma-plugin"></div><script>document.body.classList.add('theme-${figma.editorType}');const __FIGMA_COMMAND__='${typeof figma.command=="undefined"?"":figma.command}';const __SHOW_UI_DATA__=${JSON.stringify(typeof e=="undefined"?{}:e)};${__html__}</script>`;figma.showUI(i,A(x({},t),{themeColors:typeof t.themeColors=="undefined"?!0:t.themeColors}))}var B=C(()=>{});var Z=C(()=>{B()});var pt={};Tt(pt,{default:()=>Rt});function Rt(){H({height:1e3,width:1400}),figma.ui.onmessage=t=>{if(t.type==="import-selected-frame"){bt();return}if(t.type==="generate-responsive-frame"){Lt(t.payload).catch(e=>{let i=e instanceof Error?e.message:"Could not generate responsive frame.";figma.notify(i)});return}t.type==="create-export-frame-from-json"&&Ct(t.payload).catch(e=>{let i=e instanceof Error?e.message:"Could not create export frame from JSON.";figma.notify(i)})}}function bt(){let[t]=figma.currentPage.selection;if(t==null){F({type:"import-error",message:"Select a Figma frame, component, or instance first."});return}if(!R(t)){F({type:"import-error",message:"The selected layer is not a frame. Select a frame, component, or instance."});return}if(!G(t)){F({type:"import-error",message:"Select an Auto Layout frame, component, or instance. Responsive conversion needs Figma Auto Layout data."});return}F({type:"frame-imported",payload:ae(t)}),figma.notify(`Imported "${t.name}"`)}async function Lt(t){let e=await Ft(t);if(e==null){figma.notify("Import the source frame again before generating.");return}let i=p(t.sourceWidth,1,1e4),n=p(t.screenWidth,1,1e4),r=A(x({},t),{sourceWidth:i,screenWidth:n}),o=e.clone();o.name=`${e.name} / ${K(t.targetDevice)}`,o.x=e.x+e.width+80,o.y=e.y,v(o,n),await lt(o,r,i,Yt(t.sourceFrame),""),figma.currentPage.selection=[o],figma.viewport.scrollAndZoomIntoView([o]),figma.notify(`Generated ${K(t.targetDevice)} responsive frame from ${Math.round(n)}px reference.`)}async function Ft(t){if(t.sourceFrame!=null){let i=await figma.getNodeByIdAsync(t.sourceFrame.id);if(i!=null&&R(i))return i}let[e]=figma.currentPage.selection;return e!=null&&R(e)?e:null}function v(t,e){if(Mt(t),!V(t))return;let i=h(t,"height",1);M(t,e,i)}function Mt(t){if("layoutSizingHorizontal"in t&&(t.layoutSizingHorizontal="FIXED"),!b(t))return;let e=ut(t);e==="HORIZONTAL"?t.primaryAxisSizingMode="FIXED":(e==="VERTICAL"||(t.primaryAxisSizingMode="FIXED"),t.counterAxisSizingMode="FIXED")}async function Ct(t){let e=Ht(t.frame),i=await ot(e,!0);if(!R(i)){figma.notify("JSON export must resolve to a frame.");return}i.name=e.name,i.x=Wt(e.geometry.width),i.y=figma.viewport.center.y-e.geometry.height/2,figma.currentPage.appendChild(i),figma.currentPage.selection=[i],figma.viewport.scrollAndZoomIntoView([i]),figma.notify(`Created export frame "${i.name}" from JSON.`)}function Ht(t){return A(x({},rt(A(x({},t),{layout:nt(t),children:t.children.map(e=>it(e))}),0,0,t.geometry.width,t.geometry.height)),{type:t.type,schemaVersion:1,importedAt:t.importedAt})}function it(t){return rt(A(x({},t),{layout:nt(t),children:t.children.map(e=>it(e))}),t.geometry.x,t.geometry.y,t.geometry.width,t.geometry.height)}function nt(t){return A(x({},t.layout),{isAutoLayout:!1,autoLayoutDirection:"NONE",layoutMode:"NONE",layoutAlign:"INHERIT",layoutGrow:0,layoutSizingHorizontal:"FIXED",layoutSizingVertical:"FIXED"})}function rt(t,e,i,n,r){let o=y(e),l=y(i),a=Math.max(1,y(n)),c=Math.max(1,y(r)),u=W(o,l,a,c);return A(x({},t),{geometry:A(x({},t.geometry),{x:o,y:l,width:a,height:c,absoluteBounds:u,parentRelativeBounds:u,rootRelativeBounds:u})})}async function ot(t,e=!1){let i=await Ot(t);if(wt(i,t,e),z(i))for(let n of t.children){let r=await ot(n);i.appendChild(r)}return i}async function Ot(t){var e;if(t.type==="TEXT"){let i=figma.createText();return await vt(i,t),i}return t.type==="FRAME"||t.type==="COMPONENT"||t.type==="INSTANCE"||t.type==="RESPONSIVE_GROUP"||((e=t.responsive)==null?void 0:e.isVirtualGroup)===!0||t.children.length>0?figma.createFrame():(t.type==="RECTANGLE",figma.createRectangle())}function wt(t,e,i=!1){if(t.name=e.name,t.visible=e.visible,t.locked=e.locked,t.x=e.geometry.x,t.y=e.geometry.y,"rotation"in t&&(t.rotation=e.geometry.rotation),V(t)&&t.resize(Math.max(1,e.geometry.width),Math.max(1,e.geometry.height)),"opacity"in t&&typeof e.style.opacity=="number"&&(t.opacity=p(e.style.opacity,0,1)),"fills"in t){let n=O(e.style.fills);n!=null?t.fills=n:i||(t.fills=[])}if("strokes"in t){let n=O(e.style.strokes);n!=null&&(t.strokes=n)}if("strokeWeight"in t&&typeof e.style.strokeWeight=="number"&&(t.strokeWeight=e.style.strokeWeight),"cornerRadius"in t&&typeof e.style.cornerRadius=="number"&&(t.cornerRadius=e.style.cornerRadius),"effects"in t){let n=O(e.style.effects);n!=null&&(t.effects=n)}kt(t,e)}async function vt(t,e){var r,o,l,a,c,u,m,s,f,g,d,E,T;let i=(o=Dt((r=e.text)==null?void 0:r.fontName))!=null?o:{family:"Inter",style:"Regular"};await figma.loadFontAsync(i),t.fontName=i,t.characters=(a=(l=e.text)==null?void 0:l.characters)!=null?a:"",typeof((c=e.text)==null?void 0:c.fontSize)=="number"&&(t.fontSize=e.text.fontSize),(((u=e.text)==null?void 0:u.textAlignHorizontal)==="LEFT"||((m=e.text)==null?void 0:m.textAlignHorizontal)==="CENTER"||((s=e.text)==null?void 0:s.textAlignHorizontal)==="RIGHT"||((f=e.text)==null?void 0:f.textAlignHorizontal)==="JUSTIFIED")&&(t.textAlignHorizontal=e.text.textAlignHorizontal),(((g=e.text)==null?void 0:g.textAlignVertical)==="TOP"||((d=e.text)==null?void 0:d.textAlignVertical)==="CENTER"||((E=e.text)==null?void 0:E.textAlignVertical)==="BOTTOM")&&(t.textAlignVertical=e.text.textAlignVertical);let n=Jt((T=e.text)==null?void 0:T.lineHeight);n!=null&&(t.lineHeight=n)}function kt(t,e){var i;if(b(t)){let n=Vt(e.layout.layoutMode);if(Gt(t,n),n!=="NONE"){t.itemSpacing=p((i=e.layout.itemSpacing)!=null?i:0,0,1e3),t.primaryAxisAlignItems=Pt(e.layout.primaryAxisAlignItems),t.counterAxisAlignItems=Bt(e.layout.counterAxisAlignItems),t.primaryAxisSizingMode=X(e.layout.primaryAxisSizingMode),t.counterAxisSizingMode=X(e.layout.counterAxisSizingMode);let r=e.layout.padding;r!=null&&(t.paddingTop=r.top,t.paddingRight=r.right,t.paddingBottom=r.bottom,t.paddingLeft=r.left)}}"layoutAlign"in t&&(e.layout.layoutAlign==="INHERIT"||e.layout.layoutAlign==="STRETCH")&&(t.layoutAlign=e.layout.layoutAlign),"layoutGrow"in t&&typeof e.layout.layoutGrow=="number"&&(t.layoutGrow=e.layout.layoutGrow),"layoutSizingHorizontal"in t&&U(e.layout.layoutSizingHorizontal)&&(t.layoutSizingHorizontal=e.layout.layoutSizingHorizontal),"layoutSizingVertical"in t&&U(e.layout.layoutSizingVertical)&&(t.layoutSizingVertical=e.layout.layoutSizingVertical)}function Vt(t){return t==="HORIZONTAL"||t==="VERTICAL"||t==="GRID"?t:"NONE"}function Gt(t,e){if(e==="GRID"){try{t.layoutMode=e}catch(i){console.warn("This Figma runtime does not support GRID layout mode; created the node without Auto Layout grid."),t.layoutMode="NONE"}return}t.layoutMode=e}function Wt(t){let e=figma.currentPage.selection;return e.length>0?Math.max(...e.map(i=>h(i,"x",0)+h(i,"width",0)))+80:figma.viewport.center.x-t/2}function O(t){return Array.isArray(t)?t:null}function Dt(t){let e=at(t);return e==null||typeof e.family!="string"||typeof e.style!="string"?null:{family:e.family,style:e.style}}function Jt(t){let e=at(t);return e==null||typeof e.unit!="string"?null:e.unit==="PIXELS"&&typeof e.value=="number"?{unit:"PIXELS",value:e.value}:e.unit==="PERCENT"&&typeof e.value=="number"?{unit:"PERCENT",value:e.value}:e.unit==="AUTO"?{unit:"AUTO"}:null}function Pt(t){return t==="CENTER"||t==="MAX"||t==="SPACE_BETWEEN"?t:"MIN"}function Bt(t){return t==="CENTER"||t==="MAX"||t==="BASELINE"?t:"MIN"}function X(t){return t==="AUTO"?"AUTO":"FIXED"}function U(t){return t==="FIXED"||t==="HUG"||t==="FILL"}function at(t){return t!=null&&!Array.isArray(t)&&typeof t=="object"?t:null}async function lt(t,e,i,n,r){var a,c;let o=n.get(r),l=_t(e,(a=o==null?void 0:o.responsive)==null?void 0:a.nodeRule);if(((c=o==null?void 0:o.responsive)==null?void 0:c.replacement)!=null&&jt(o.responsive.replacement,e.screenWidth)){$t(t,o.responsive.replacement);return}if(b(t)){let u=Ut(t,e,l);if(u!=null&&(t.layoutMode=u,t.itemSpacing=p(l.stackGap,0,200),t.counterAxisAlignItems=qt(l.stackAlignment)),q(t)){let s=p(e.layoutRules.outputPadding,0,200);t.paddingTop=s,t.paddingRight=s,t.paddingBottom=s,t.paddingLeft=s,v(t,e.screenWidth)}let m=u!=null?u:ut(t);m!=null&&(Kt(t,m,l.stackAlignment,o),Qt(t,m,l,o)),q(t)&&v(t,e.screenWidth)}if(t.type==="TEXT"&&await Zt(t,e,i),z(t))for(let u=0;u<t.children.length;u+=1){let m=t.children[u];await lt(m,e,i,n,r===""?String(u):`${r}/${u}`)}}async function Zt(t,e,i){if(typeof t.fontSize!="number")return;await Xt(t);let n=p(e.screenWidth/i,.5,2),r=t.fontSize*n,o=p(e.layoutRules.minimumTextSize,8,48);e.layoutRules.textScaleMode==="scale"?t.fontSize=Math.max(o,r):e.layoutRules.textScaleMode==="clamp"&&(t.fontSize=Math.max(o,Math.min(t.fontSize,r))),e.layoutRules.tightenLineHeight&&t.lineHeight!==figma.mixed&&(t.lineHeight={unit:"PERCENT",value:115})}async function Xt(t){t.fontName!==figma.mixed&&await figma.loadFontAsync(t.fontName)}function Ut(t,e,i){return i.rowToColumnMode==="always"?_(t,i):i.rowToColumnMode==="never"?null:(i.conversionDirection==="row-to-column"?e.screenWidth<=i.rowToColumnBreakpoint:e.screenWidth>=i.rowToColumnBreakpoint)?_(t,i):null}function _(t,e){return b(t)?e.conversionDirection==="row-to-column"?t.layoutMode==="HORIZONTAL"?"VERTICAL":null:t.layoutMode==="VERTICAL"?"HORIZONTAL":null:null}function ut(t){return t.layoutMode==="HORIZONTAL"||t.layoutMode==="VERTICAL"?t.layoutMode:null}function _t(t,e){return(e==null?void 0:e.enabled)===!0?{conversionDirection:e.conversionDirection,rowToColumnMode:e.rowToColumnMode,rowToColumnBreakpoint:e.rowToColumnBreakpoint,stackGap:e.stackGap,stackAlignment:e.stackAlignment}:{conversionDirection:t.layoutRules.conversionDirection,rowToColumnMode:t.layoutRules.rowToColumnMode,rowToColumnBreakpoint:t.layoutRules.rowToColumnBreakpoint,stackGap:t.layoutRules.stackGap,stackAlignment:t.layoutRules.stackAlignment}}function $t(t,e){if(e==null||e.preset!=="hamburger")return;let i=$(e.width),n=$(e.height);if(z(t))for(;t.children.length>0;)t.children[0].remove();if("layoutGrow"in t&&(t.layoutGrow=0),"layoutAlign"in t&&(t.layoutAlign="INHERIT"),"layoutSizingHorizontal"in t&&(t.layoutSizingHorizontal="FIXED"),"layoutSizingVertical"in t&&(t.layoutSizingVertical="FIXED"),b(t)&&(t.layoutMode="NONE",t.primaryAxisSizingMode="FIXED",t.counterAxisSizingMode="FIXED"),M(t,i,n),"fills"in t&&(t.fills=[w(1,1,1)]),"strokes"in t&&(t.strokes=[w(.15,.17,.2)]),"strokeWeight"in t&&(t.strokeWeight=1),"cornerRadius"in t&&(t.cornerRadius=8),!z(t))return;let r=Math.max(12,Math.min(i-12,Math.round(i*.5))),o=Math.max(2,Math.min(4,Math.round(n*.08))),l=Math.max(4,Math.round(n*.12)),a=o*3+l*2,c=Math.max(0,(i-r)/2),u=Math.max(0,(n-a)/2);for(let m=0;m<3;m+=1){let s=figma.createRectangle();s.name=`Hamburger line ${m+1}`,s.x=c,s.y=u+m*(o+l),s.resize(r,o),s.fills=[w(.1,.12,.16)],s.cornerRadius=999,t.appendChild(s)}}function jt(t,e){return t==null||t.enabled!==!0||t.preset!=="hamburger"?!1:t.trigger==="always"?!0:t.trigger==="never"?!1:e<=t.breakpoint}function $(t){return Math.min(240,Math.max(16,Math.round(t)))}function w(t,e,i){return{type:"SOLID",visible:!0,opacity:1,color:{r:t,g:e,b:i}}}function Yt(t){let e=new Map;return t==null||st(t,"",e),e}function st(t,e,i){i.set(e,t),t.children.forEach((n,r)=>{st(n,e===""?String(r):`${e}/${r}`,i)})}function qt(t){return t==="center"?"CENTER":"MIN"}function Kt(t,e,i,n){var o;if(!z(t))return;let r=(o=mt(n))!=null?o:e;for(let l=0;l<t.children.length;l+=1){let a=t.children[l],c=n==null?void 0:n.children[l],u=N(c,a,"horizontal",e==="VERTICAL"&&i==="stretch",e,r),m=N(c,a,"vertical",e==="HORIZONTAL"&&i==="stretch",e,r),s=e==="HORIZONTAL"?u:m,f=e==="HORIZONTAL"?m:u;if("layoutAlign"in a){if(a.layoutAlign=f?"STRETCH":"INHERIT","layoutGrow"in a&&(a.layoutGrow=s?1:0),"layoutSizingHorizontal"in a){let g=u?"FILL":j(c,"horizontal",e,r);g!=null&&(a.layoutSizingHorizontal=g)}if("layoutSizingVertical"in a){let g=m?"FILL":j(c,"vertical",e,r);g!=null&&(a.layoutSizingVertical=g)}}}}function Qt(t,e,i,n){var u,m;if(!z(t))return;let r=ie(t),o=Math.max(1,t.width-r.left-r.right),l=Math.max(1,t.height-r.top-r.bottom),a=p((u=t.itemSpacing)!=null?u:i.stackGap,0,200),c=(m=mt(n))!=null?m:e;if(e==="VERTICAL"){te(t,n,c,o,l,a);return}ee(t,n,c,i,o,l,a)}function te(t,e,i,n,r,o){let l=t.children.map((s,f)=>{let g=e==null?void 0:e.children[f],d=N(g,s,"horizontal",!0,"VERTICAL",i),E=N(g,s,"vertical",!1,"VERTICAL",i),T=d?n:Math.min(h(s,"width",n),n);return{child:s,fillsHeight:E,nextWidth:T}}),a=o*Math.max(0,l.length-1),c=l.reduce((s,f)=>f.fillsHeight?s:s+h(f.child,"height",0),0),u=l.filter(s=>s.fillsHeight).length,m=u===0?0:Math.max(1,(r-a-c)/u);for(let s of l){let f=s.fillsHeight?m:h(s.child,"height",1);M(s.child,s.nextWidth,f)}}function ee(t,e,i,n,r,o,l){let a=t.children.map((f,g)=>{let d=e==null?void 0:e.children[g];return{child:f,fillsWidth:N(d,f,"horizontal",!1,"HORIZONTAL",i),fillsHeight:N(d,f,"vertical",n.stackAlignment==="stretch","HORIZONTAL",i)}}),c=l*Math.max(0,a.length-1),u=a.reduce((f,g)=>g.fillsWidth?f:f+h(g.child,"width",0),0),m=a.filter(f=>f.fillsWidth).length,s=m===0?0:Math.max(1,(r-c-u)/m);for(let f of a){let g=h(f.child,"width",1),d=h(f.child,"height",1),E=f.fillsWidth?s:g,T=f.fillsHeight?o:d;M(f.child,E,T)}}function ie(t){return{top:p(t.paddingTop,0,1e4),right:p(t.paddingRight,0,1e4),bottom:p(t.paddingBottom,0,1e4),left:p(t.paddingLeft,0,1e4)}}function M(t,e,i){if(!V(t))return;let n=Math.max(1,Math.round(e*1e3)/1e3),r=Math.max(1,Math.round(i*1e3)/1e3);if(!(Math.abs(h(t,"width",n)-n)<.01&&Math.abs(h(t,"height",r)-r)<.01))try{t.resize(n,r)}catch(o){}}function N(t,e,i,n,r,o=r){let l=gt(i,r,o),a=ct(t,l);if(a!=null)return a==="FILL";if((t==null?void 0:t.layout.layoutAlign)==="STRETCH"&&ft(o,l)||typeof(t==null?void 0:t.layout.layoutGrow)=="number"&&t.layout.layoutGrow>0&&k(o,l))return!0;let c=ne(e,i,r);return c!=null?c==="FILL":oe(e,i,r)||n}function ct(t,e){if(t==null)return null;let i=e==="horizontal"?t.layout.layoutSizingHorizontal:t.layout.layoutSizingVertical;if(i==="FILL"||i==="HUG"||i==="FIXED")return i;let n=re(t,e)?t.layout.primaryAxisSizingMode:t.layout.counterAxisSizingMode;return n==="AUTO"?"HUG":n==="FIXED"?"FIXED":null}function j(t,e,i,n){return ct(t,gt(e,i,n))}function mt(t){return(t==null?void 0:t.layout.layoutMode)==="HORIZONTAL"||(t==null?void 0:t.layout.layoutMode)==="VERTICAL"?t.layout.layoutMode:null}function ne(t,e,i){return e==="horizontal"&&"layoutSizingHorizontal"in t?t.layoutSizingHorizontal:e==="vertical"&&"layoutSizingVertical"in t?t.layoutSizingVertical:"layoutGrow"in t&&t.layoutGrow>0&&k(i,e)?"FILL":null}function re(t,e){return e==="horizontal"?t.layout.layoutMode==="HORIZONTAL":t.layout.layoutMode==="VERTICAL"}function k(t,e){return e==="horizontal"?t==="HORIZONTAL":t==="VERTICAL"}function ft(t,e){return e==="horizontal"?t==="VERTICAL":t==="HORIZONTAL"}function gt(t,e,i){return e==null||i==null||e===i?t:k(e,t)?Y(i,"primary"):Y(i,"cross")}function Y(t,e){return e==="primary"?t==="HORIZONTAL"?"horizontal":"vertical":t==="HORIZONTAL"?"vertical":"horizontal"}function oe(t,e,i){return"layoutAlign"in t&&t.layoutAlign==="STRETCH"&&ft(i,e)}function q(t){return R(t)&&t.parent===figma.currentPage}function b(t){return"layoutMode"in t}function V(t){return"resize"in t&&typeof t.resize=="function"}function K(t){return t==="mobile"?"Mobile":t==="tablet"?"Tablet":t==="desktop"?"Desktop":"Custom"}function ae(t){let e=yt(t);return A(x({},ht({node:t,isRoot:!0,rootBounds:e,parentBounds:null,parentId:null,depth:0,siblingIndex:0,siblingCount:1})),{type:t.type,schemaVersion:1,importedAt:new Date().toISOString()})}function ht({node:t,isRoot:e=!1,rootBounds:i,parentBounds:n,parentId:r,depth:o,siblingIndex:l,siblingCount:a}){let c=yt(t),u=tt(c,n!=null?n:c),m=tt(c,i),s=n==null?void 0:et(u,n),f=et(m,i);return{id:t.id,name:t.name,type:t.type,responsive:ue(t,e),visible:Q(t,"visible",!0),locked:Q(t,"locked",!1),geometry:{x:h(t,"x",0),y:h(t,"y",0),width:h(t,"width",0),height:h(t,"height",0),rotation:h(t,"rotation",0),absoluteBounds:c,parentRelativeBounds:u,rootRelativeBounds:m,percentOfParent:s,percentOfRoot:f,hierarchy:{parentId:r,depth:o,siblingIndex:l,siblingCount:a}},layout:le(t),style:se(t),text:t.type==="TEXT"?ce(t):void 0,children:z(t)?t.children.map((g,d)=>ht({node:g,rootBounds:i,parentBounds:c,parentId:t.id,depth:o+1,siblingIndex:d,siblingCount:t.children.length})):[]}}function le(t){let e={isAutoLayout:G(t)};return"constraints"in t&&(e.constraints=S(t.constraints)),"layoutMode"in t&&(e.layoutMode=t.layoutMode,e.autoLayoutDirection=t.layoutMode),"layoutAlign"in t&&(e.layoutAlign=t.layoutAlign),"layoutGrow"in t&&(e.layoutGrow=t.layoutGrow),"layoutSizingHorizontal"in t&&(e.layoutSizingHorizontal=t.layoutSizingHorizontal),"layoutSizingVertical"in t&&(e.layoutSizingVertical=t.layoutSizingVertical),"itemSpacing"in t&&(e.itemSpacing=t.itemSpacing),"counterAxisSpacing"in t&&t.counterAxisSpacing!=null&&(e.counterAxisSpacing=t.counterAxisSpacing),"primaryAxisAlignItems"in t&&(e.primaryAxisAlignItems=t.primaryAxisAlignItems),"counterAxisAlignItems"in t&&(e.counterAxisAlignItems=t.counterAxisAlignItems),"layoutWrap"in t&&(e.layoutWrap=t.layoutWrap),"paddingTop"in t&&"paddingRight"in t&&"paddingBottom"in t&&"paddingLeft"in t&&(e.padding={top:t.paddingTop,right:t.paddingRight,bottom:t.paddingBottom,left:t.paddingLeft}),"primaryAxisSizingMode"in t&&(e.primaryAxisSizingMode=t.primaryAxisSizingMode),"counterAxisSizingMode"in t&&(e.counterAxisSizingMode=t.counterAxisSizingMode),e}function ue(t,e){let i=G(t);return{groupRole:e?"root":void 0,conversionRole:i?"auto-layout-container":"manual-layer",acceptsChildren:z(t)}}function se(t){let e={};return"opacity"in t&&(e.opacity=t.opacity),"blendMode"in t&&(e.blendMode=t.blendMode),"fills"in t&&t.fills!==figma.mixed&&(e.fills=S(t.fills)),"strokes"in t&&(e.strokes=S(t.strokes)),"strokeWeight"in t&&t.strokeWeight!==figma.mixed&&(e.strokeWeight=t.strokeWeight),"cornerRadius"in t&&(e.cornerRadius=t.cornerRadius===figma.mixed?"mixed":t.cornerRadius),"effects"in t&&(e.effects=S(t.effects)),e}function ce(t){return{characters:t.characters,fontSize:t.fontSize===figma.mixed?"mixed":t.fontSize,fontName:S(t.fontName),fontWeight:t.fontWeight===figma.mixed?void 0:t.fontWeight,textAlignHorizontal:t.textAlignHorizontal,textAlignVertical:t.textAlignVertical,lineHeight:S(t.lineHeight),letterSpacing:S(t.letterSpacing)}}function R(t){return t.type==="FRAME"||t.type==="COMPONENT"||t.type==="INSTANCE"}function G(t){return"layoutMode"in t&&t.layoutMode!=="NONE"}function z(t){return"children"in t}function h(t,e,i){let n=t[e];return typeof n=="number"?n:i}function Q(t,e,i){let n=t[e];return typeof n=="boolean"?n:i}function yt(t){var l,a,c,u;let e="absoluteBoundingBox"in t?t.absoluteBoundingBox:null,i=(l=e==null?void 0:e.x)!=null?l:h(t,"x",0),n=(a=e==null?void 0:e.y)!=null?a:h(t,"y",0),r=(c=e==null?void 0:e.width)!=null?c:h(t,"width",0),o=(u=e==null?void 0:e.height)!=null?u:h(t,"height",0);return W(i,n,r,o)}function tt(t,e){return W(t.x-e.x,t.y-e.y,t.width,t.height)}function et(t,e){return{x:I(t.x,e.width),y:I(t.y,e.height),width:I(t.width,e.width),height:I(t.height,e.height),right:I(t.right,e.width),bottom:I(t.bottom,e.height)}}function W(t,e,i,n){let r=y(t),o=y(e),l=y(i),a=y(n);return{x:r,y:o,width:l,height:a,right:y(r+l),bottom:y(o+a),centerX:y(r+l/2),centerY:y(o+a/2)}}function I(t,e){return e===0?0:y(t/e*100)}function y(t){return Math.round(t*1e3)/1e3}function p(t,e,i){return Number.isFinite(t)?Math.min(i,Math.max(e,t)):e}function S(t){return t===figma.mixed?"mixed":t==null?null:typeof t=="string"||typeof t=="number"||typeof t=="boolean"?t:Array.isArray(t)?t.map(e=>S(e)):typeof t=="object"?Object.fromEntries(Object.entries(t).map(([e,i])=>[e,S(i)])):String(t)}function F(t){figma.ui.postMessage(t)}var dt=C(()=>{"use strict";Z()});var me={"src/main.ts--default":(dt(),Nt(pt)).default},fe="src/main.ts--default";me[fe]();
+var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __spreadValues = (a, b) => {
+  for (var prop in b || (b = {}))
+    if (__hasOwnProp.call(b, prop))
+      __defNormalProp(a, prop, b[prop]);
+  if (__getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(b)) {
+      if (__propIsEnum.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    }
+  return a;
+};
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// node_modules/@create-figma-plugin/utilities/lib/ui.js
+function showUI(options, data) {
+  if (typeof __html__ === "undefined") {
+    throw new Error("No UI defined");
+  }
+  const html = `<div id="create-figma-plugin"></div><script>document.body.classList.add('theme-${figma.editorType}');const __FIGMA_COMMAND__='${typeof figma.command === "undefined" ? "" : figma.command}';const __SHOW_UI_DATA__=${JSON.stringify(typeof data === "undefined" ? {} : data)};${__html__}</script>`;
+  figma.showUI(html, __spreadProps(__spreadValues({}, options), {
+    themeColors: typeof options.themeColors === "undefined" ? true : options.themeColors
+  }));
+}
+var init_ui = __esm({
+  "node_modules/@create-figma-plugin/utilities/lib/ui.js"() {
+  }
+});
+
+// node_modules/@create-figma-plugin/utilities/lib/index.js
+var init_lib = __esm({
+  "node_modules/@create-figma-plugin/utilities/lib/index.js"() {
+    init_ui();
+  }
+});
+
+// src/main.ts
+var main_exports = {};
+__export(main_exports, {
+  default: () => main_default
+});
+function main_default() {
+  showUI({
+    height: 1e3,
+    width: 1400
+  });
+  figma.ui.onmessage = (message) => {
+    if (message.type === "import-selected-frame") {
+      importSelectedFrame();
+      return;
+    }
+    if (message.type === "generate-responsive-frame") {
+      generateResponsiveFrame(message.payload).catch((error) => {
+        const message2 = error instanceof Error ? error.message : "Could not generate responsive frame.";
+        figma.notify(message2);
+      });
+      return;
+    }
+    if (message.type === "create-export-frame-from-json") {
+      createExportFrameFromJson(message.payload).catch((error) => {
+        const message2 = error instanceof Error ? error.message : "Could not create export frame from JSON.";
+        figma.notify(message2);
+      });
+    }
+  };
+}
+function importSelectedFrame() {
+  const [selectedNode] = figma.currentPage.selection;
+  if (selectedNode == null) {
+    sendToUi({
+      type: "import-error",
+      message: "Select a Figma frame, component, or instance first."
+    });
+    return;
+  }
+  if (!isImportableFrameNode(selectedNode)) {
+    sendToUi({
+      type: "import-error",
+      message: "The selected layer is not a frame. Select a frame, component, or instance."
+    });
+    return;
+  }
+  if (!isAutoLayoutContainer(selectedNode)) {
+    sendToUi({
+      type: "import-error",
+      message: "Select an Auto Layout frame, component, or instance. Responsive conversion needs Figma Auto Layout data."
+    });
+    return;
+  }
+  sendToUi({
+    type: "frame-imported",
+    payload: serializeFrame(selectedNode)
+  });
+  figma.notify(`Imported "${selectedNode.name}"`);
+}
+async function generateResponsiveFrame(payload) {
+  var _a;
+  const sourceNode = await getGenerationSourceNode(payload);
+  if (sourceNode == null) {
+    figma.notify("Import the source frame again before generating.");
+    return;
+  }
+  const sourceWidth = clampNumber(payload.sourceWidth, 1, 1e4);
+  const referenceWidth = clampNumber(payload.screenWidth, 1, 1e4);
+  const normalizedPayload = __spreadProps(__spreadValues({}, payload), {
+    sourceWidth,
+    screenWidth: referenceWidth
+  });
+  const sourceFrame = (_a = payload.sourceFrame) != null ? _a : serializeFrame(sourceNode);
+  const materializedFrame = materializeExportPreviewFrame({
+    frame: sourceFrame,
+    screenWidth: referenceWidth,
+    layoutRules: normalizedPayload.layoutRules
+  });
+  const generatedNode = await createSceneNodeFromSerializedNode(materializedFrame, true);
+  if (!isImportableFrameNode(generatedNode)) {
+    figma.notify("Generated responsive output must resolve to a frame.");
+    return;
+  }
+  generatedNode.name = `${sourceNode.name} / ${getDeviceLabel(payload.targetDevice)}`;
+  generatedNode.x = sourceNode.x + sourceNode.width + 80;
+  generatedNode.y = sourceNode.y;
+  figma.currentPage.appendChild(generatedNode);
+  figma.currentPage.selection = [generatedNode];
+  figma.viewport.scrollAndZoomIntoView([generatedNode]);
+  figma.notify(`Generated ${getDeviceLabel(payload.targetDevice)} responsive frame from ${Math.round(referenceWidth)}px reference.`);
+}
+async function getGenerationSourceNode(payload) {
+  if (payload.sourceFrame != null) {
+    const importedSourceNode = await figma.getNodeByIdAsync(payload.sourceFrame.id);
+    if (importedSourceNode != null && isImportableFrameNode(importedSourceNode)) {
+      return importedSourceNode;
+    }
+  }
+  const [selectedNode] = figma.currentPage.selection;
+  return selectedNode != null && isImportableFrameNode(selectedNode) ? selectedNode : null;
+}
+async function createExportFrameFromJson(payload) {
+  const materializedFrame = materializeExportPreviewFrame(payload);
+  const exportFrame = await createSceneNodeFromSerializedNode(materializedFrame, true);
+  if (!isImportableFrameNode(exportFrame)) {
+    figma.notify("JSON export must resolve to a frame.");
+    return;
+  }
+  exportFrame.name = materializedFrame.name;
+  exportFrame.x = getNextExportFrameX(materializedFrame.geometry.width);
+  exportFrame.y = figma.viewport.center.y - materializedFrame.geometry.height / 2;
+  figma.currentPage.appendChild(exportFrame);
+  figma.currentPage.selection = [exportFrame];
+  figma.viewport.scrollAndZoomIntoView([exportFrame]);
+  figma.notify(`Created export frame "${exportFrame.name}" from JSON.`);
+}
+function materializeExportPreviewFrame(payload) {
+  const reviewWidth = Number.isFinite(payload.screenWidth) && payload.screenWidth > 0 ? payload.screenWidth : payload.frame.geometry.width;
+  const exportGroups = createJsonExportReviewGroups(payload.frame, reviewWidth, payload.layoutRules);
+  const reviewHeight = Math.max(
+    Math.min(payload.frame.geometry.height, 760),
+    exportGroups.reduce((bottom, group) => Math.max(bottom, group.y + group.height), 0) + 24
+  );
+  return __spreadProps(__spreadValues({}, withSerializedGeometry(
+    __spreadProps(__spreadValues({}, payload.frame), {
+      layout: getStaticSerializedLayout(payload.frame),
+      children: exportGroups.map((group) => materializeJsonExportNode({
+        node: group.node,
+        origin: group.sourceBounds,
+        scale: group.scale,
+        layoutRules: payload.layoutRules,
+        reviewWidth,
+        x: group.x,
+        y: group.y,
+        width: group.width,
+        height: group.height
+      }))
+    }),
+    0,
+    0,
+    reviewWidth,
+    reviewHeight
+  )), {
+    type: payload.frame.type,
+    schemaVersion: 1,
+    importedAt: payload.frame.importedAt
+  });
+}
+function createJsonExportReviewGroups(frame, reviewWidth, layoutRules) {
+  const outerPadding = layoutRules.outputPadding;
+  const rootReplacement = materializeJsonExportReplacementNode(frame, reviewWidth);
+  if (rootReplacement != null) {
+    return [{
+      node: rootReplacement,
+      x: outerPadding,
+      y: outerPadding,
+      width: rootReplacement.geometry.width,
+      height: rootReplacement.geometry.height,
+      sourceBounds: rootReplacement.geometry,
+      scale: 1
+    }];
+  }
+  const contentWidth = Math.max(1, reviewWidth - outerPadding * 2);
+  const visibleChildren = frame.children.filter((child) => child.visible).map((child) => {
+    var _a;
+    return (_a = materializeJsonExportReplacementNode(child, reviewWidth)) != null ? _a : child;
+  }).sort((first, second) => first.geometry.y - second.geometry.y || first.geometry.x - second.geometry.x);
+  let nextY = outerPadding;
+  return visibleChildren.map((child) => {
+    const sourceBounds = child.geometry;
+    const scale = contentWidth / Math.max(sourceBounds.width, 1);
+    const height = Math.max(1, getJsonExportNodeHeight(child, layoutRules, reviewWidth) * scale);
+    const group = {
+      node: child,
+      x: outerPadding,
+      y: nextY,
+      width: contentWidth,
+      height,
+      sourceBounds,
+      scale
+    };
+    nextY += height + layoutRules.stackGap;
+    return group;
+  });
+}
+function materializeJsonExportNode({
+  node,
+  origin,
+  scale,
+  layoutRules,
+  reviewWidth,
+  x = (node.geometry.x - origin.x) * scale,
+  y = (node.geometry.y - origin.y) * scale,
+  width = node.geometry.width * scale,
+  height = getJsonExportNodeHeight(node, layoutRules, reviewWidth) * scale
+}) {
+  const arrangedChildren = arrangeJsonExportChildren(node, layoutRules, reviewWidth);
+  const text = node.text == null ? void 0 : __spreadProps(__spreadValues({}, node.text), {
+    fontSize: typeof node.text.fontSize === "number" ? getJsonExportFontSize(node.text.fontSize, scale, layoutRules) : node.text.fontSize,
+    lineHeight: scaleJsonExportLineHeight(node.text.lineHeight, scale)
+  });
+  const style = __spreadProps(__spreadValues({}, node.style), {
+    strokeWeight: typeof node.style.strokeWeight === "number" ? node.style.strokeWeight * scale : node.style.strokeWeight,
+    cornerRadius: typeof node.style.cornerRadius === "number" ? node.style.cornerRadius * scale : node.style.cornerRadius
+  });
+  return withSerializedGeometry(
+    __spreadProps(__spreadValues({}, node), {
+      layout: getStaticSerializedLayout(node),
+      style,
+      text,
+      children: arrangedChildren.filter((child) => child.node.visible).map((child) => materializeJsonExportNode({
+        node: child.node,
+        origin: { x: 0, y: 0 },
+        scale,
+        layoutRules,
+        reviewWidth
+      }))
+    }),
+    x,
+    y,
+    width,
+    height
+  );
+}
+function materializeJsonExportReplacementNode(node, reviewWidth) {
+  var _a;
+  const rule = (_a = node.responsive) == null ? void 0 : _a.replacement;
+  if (!isReplacementActive(rule, reviewWidth)) {
+    return null;
+  }
+  const { width, height } = getSerializedReplacementDimensions(node, rule);
+  const lineWidth = Math.max(12, Math.min(width - 12, Math.round(width * 0.5)));
+  const lineHeight = Math.max(2, Math.min(4, Math.round(height * 0.08)));
+  const gap = Math.max(4, Math.round(height * 0.12));
+  const totalLineHeight = lineHeight * 3 + gap * 2;
+  const startX = Math.max(0, (width - lineWidth) / 2);
+  const startY = Math.max(0, (height - totalLineHeight) / 2);
+  return __spreadProps(__spreadValues({}, withSerializedGeometry(node, node.geometry.x, node.geometry.y, width, height)), {
+    name: `${node.name} / hamburger`,
+    layout: getStaticSerializedLayout(node),
+    style: __spreadProps(__spreadValues({}, node.style), {
+      fills: [createSerializedSolidPaint(1, 1, 1)],
+      strokes: [createSerializedSolidPaint(0.15, 0.17, 0.2)],
+      strokeWeight: 1,
+      cornerRadius: 8
+    }),
+    text: void 0,
+    children: [0, 1, 2].map((index) => ({
+      id: `${node.id}-hamburger-line-${index}`,
+      name: `Hamburger line ${index + 1}`,
+      type: "RECTANGLE",
+      visible: true,
+      locked: false,
+      geometry: createSerializedGeometry(
+        startX,
+        startY + index * (lineHeight + gap),
+        lineWidth,
+        lineHeight
+      ),
+      layout: {
+        isAutoLayout: false,
+        layoutMode: "NONE",
+        layoutSizingHorizontal: "FIXED",
+        layoutSizingVertical: "FIXED"
+      },
+      style: {
+        fills: [createSerializedSolidPaint(0.1, 0.12, 0.16)],
+        cornerRadius: 999
+      },
+      children: []
+    }))
+  });
+}
+function createSerializedSolidPaint(r, g, b) {
+  return {
+    type: "SOLID",
+    visible: true,
+    opacity: 1,
+    color: {
+      r,
+      g,
+      b
+    }
+  };
+}
+function getJsonExportNodeHeight(node, layoutRules, reviewWidth) {
+  var _a;
+  const replacementNode = materializeJsonExportReplacementNode(node, reviewWidth);
+  if (replacementNode != null) {
+    return replacementNode.geometry.height;
+  }
+  if (node.children.length === 0) {
+    return node.geometry.height;
+  }
+  const arrangedChildren = arrangeJsonExportChildren(node, layoutRules, reviewWidth);
+  const childrenBottom = arrangedChildren.reduce((bottom, child) => {
+    return Math.max(
+      bottom,
+      child.node.geometry.y + getJsonExportNodeHeight(child.node, layoutRules, reviewWidth)
+    );
+  }, 0);
+  const padding = (_a = node.layout.padding) != null ? _a : {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+  if (getJsonExportNodeAxisSizing(node, "vertical") === "HUG") {
+    return Math.max(1, childrenBottom + padding.bottom);
+  }
+  return Math.max(node.geometry.height, childrenBottom);
+}
+function arrangeJsonExportChildren(node, layoutRules, reviewWidth) {
+  var _a;
+  const layoutNode = __spreadProps(__spreadValues({}, node), {
+    children: node.children.map((child) => {
+      var _a2;
+      return (_a2 = materializeJsonExportReplacementNode(child, reviewWidth)) != null ? _a2 : child;
+    })
+  });
+  const effectiveRules = getEffectiveJsonExportRules(layoutNode, layoutRules);
+  const convertedLayoutMode = getConvertedJsonExportLayoutMode(layoutNode, effectiveRules, reviewWidth);
+  const activeLayoutMode = convertedLayoutMode != null ? convertedLayoutMode : getNativeJsonExportLayoutMode(layoutNode);
+  const sourceParentLayoutMode = (_a = getNativeJsonExportLayoutMode(layoutNode)) != null ? _a : activeLayoutMode;
+  const activeRules = convertedLayoutMode == null ? getNativeJsonExportLayoutRules(layoutNode, effectiveRules) : effectiveRules;
+  if (activeLayoutMode == null) {
+    return layoutNode.children.map((child) => ({ node: child }));
+  }
+  if (activeLayoutMode === "HORIZONTAL") {
+    return arrangeJsonExportChildrenHorizontally(layoutNode, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode);
+  }
+  return arrangeJsonExportChildrenVertically(layoutNode, layoutRules, activeRules, reviewWidth, sourceParentLayoutMode);
+}
+function arrangeJsonExportChildrenVertically(node, layoutRules, effectiveRules, reviewWidth, sourceParentLayoutMode) {
+  var _a;
+  const padding = (_a = node.layout.padding) != null ? _a : {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+  const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right);
+  const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom);
+  const childLayouts = node.children.map((child) => {
+    const childWidth = shouldFillJsonExportAxis(
+      child,
+      "horizontal",
+      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      "VERTICAL",
+      sourceParentLayoutMode
+    ) ? contentWidth : Math.min(child.geometry.width, contentWidth);
+    const childForWidth = withSerializedGeometry(
+      child,
+      child.geometry.x,
+      child.geometry.y,
+      childWidth,
+      child.geometry.height
+    );
+    return {
+      child,
+      childWidth,
+      baseHeight: getJsonExportNodeHeight(childForWidth, layoutRules, reviewWidth),
+      fillsHeight: shouldFillJsonExportAxis(child, "vertical", false, "VERTICAL", sourceParentLayoutMode)
+    };
+  });
+  const justify = getJsonExportMainAxisAlign(node);
+  const align = getJsonExportCrossAxisAlign(node, effectiveRules);
+  const baseGap = effectiveRules.stackGap;
+  const baseGapTotal = baseGap * Math.max(0, childLayouts.length - 1);
+  const fillHeightCount = childLayouts.filter((child) => child.fillsHeight).length;
+  const fixedHeightTotal = childLayouts.reduce((total, child) => {
+    return child.fillsHeight ? total : total + child.baseHeight;
+  }, 0);
+  const fillHeight = fillHeightCount === 0 ? 0 : Math.max(1, (contentHeight - baseGapTotal - fixedHeightTotal) / fillHeightCount);
+  const totalChildrenHeight = childLayouts.reduce((total, child) => {
+    return total + (child.fillsHeight ? fillHeight : child.baseHeight);
+  }, 0);
+  const mainUsed = totalChildrenHeight + baseGapTotal;
+  const dynamicGap = getJsonExportDynamicMainAxisGap(justify, baseGap, contentHeight, totalChildrenHeight, childLayouts.length);
+  let nextY = padding.top + getJsonExportMainAxisOffset(justify, contentHeight, mainUsed);
+  return childLayouts.map((childLayout) => {
+    const child = childLayout.child;
+    const childWidth = childLayout.childWidth;
+    const childHeight = childLayout.fillsHeight ? fillHeight : childLayout.baseHeight;
+    const childX = padding.left + getJsonExportCrossAxisOffset(align, contentWidth, childWidth);
+    const nextChild = withSerializedGeometry(
+      child,
+      childX,
+      nextY,
+      childWidth,
+      childHeight
+    );
+    nextY += childHeight + dynamicGap;
+    return {
+      node: nextChild
+    };
+  });
+}
+function arrangeJsonExportChildrenHorizontally(node, _layoutRules, effectiveRules, _reviewWidth, sourceParentLayoutMode) {
+  var _a;
+  const padding = (_a = node.layout.padding) != null ? _a : {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  };
+  const contentWidth = Math.max(0, node.geometry.width - padding.left - padding.right);
+  const contentHeight = Math.max(0, node.geometry.height - padding.top - padding.bottom);
+  const childLayouts = node.children.map((child) => ({
+    child,
+    fillsWidth: shouldFillJsonExportAxis(child, "horizontal", false, "HORIZONTAL", sourceParentLayoutMode),
+    childHeight: shouldFillJsonExportAxis(
+      child,
+      "vertical",
+      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      "HORIZONTAL",
+      sourceParentLayoutMode
+    ) ? contentHeight : child.geometry.height
+  }));
+  const justify = getJsonExportMainAxisAlign(node);
+  const align = getJsonExportCrossAxisAlign(node, effectiveRules);
+  const baseGap = effectiveRules.stackGap;
+  const baseGapTotal = baseGap * Math.max(0, childLayouts.length - 1);
+  const fillWidthCount = childLayouts.filter((child) => child.fillsWidth).length;
+  const fixedWidthTotal = childLayouts.reduce((total, child) => {
+    return child.fillsWidth ? total : total + child.child.geometry.width;
+  }, 0);
+  const fillChildWidth = fillWidthCount === 0 ? 0 : Math.max(1, (contentWidth - baseGapTotal - fixedWidthTotal) / fillWidthCount);
+  const totalChildrenWidth = childLayouts.reduce((total, child) => {
+    return total + (child.fillsWidth ? fillChildWidth : child.child.geometry.width);
+  }, 0);
+  const mainUsed = totalChildrenWidth + baseGapTotal;
+  const dynamicGap = getJsonExportDynamicMainAxisGap(justify, baseGap, contentWidth, totalChildrenWidth, childLayouts.length);
+  let nextX = padding.left + getJsonExportMainAxisOffset(justify, contentWidth, mainUsed);
+  return childLayouts.map((childLayout) => {
+    const child = childLayout.child;
+    const childWidth = childLayout.fillsWidth ? fillChildWidth : child.geometry.width;
+    const childHeight = childLayout.childHeight;
+    const childY = padding.top + getJsonExportCrossAxisOffset(align, contentHeight, childHeight);
+    const nextChild = withSerializedGeometry(
+      child,
+      nextX,
+      childY,
+      childWidth,
+      childHeight
+    );
+    nextX += childWidth + dynamicGap;
+    return {
+      node: nextChild
+    };
+  });
+}
+function getConvertedJsonExportLayoutMode(node, layoutRules, reviewWidth) {
+  if (layoutRules.rowToColumnMode === "always") {
+    return getTargetJsonExportLayoutMode(node, layoutRules);
+  }
+  if (layoutRules.rowToColumnMode === "never") {
+    return null;
+  }
+  const shouldConvert = layoutRules.conversionDirection === "row-to-column" ? reviewWidth <= layoutRules.rowToColumnBreakpoint : reviewWidth >= layoutRules.rowToColumnBreakpoint;
+  return shouldConvert ? getTargetJsonExportLayoutMode(node, layoutRules) : null;
+}
+function getTargetJsonExportLayoutMode(node, layoutRules) {
+  if (layoutRules.conversionDirection === "row-to-column") {
+    return node.layout.layoutMode === "HORIZONTAL" ? "VERTICAL" : null;
+  }
+  return node.layout.layoutMode === "VERTICAL" ? "HORIZONTAL" : null;
+}
+function getNativeJsonExportLayoutMode(node) {
+  if (node.layout.layoutMode === "HORIZONTAL" || node.layout.layoutMode === "VERTICAL") {
+    return node.layout.layoutMode;
+  }
+  return null;
+}
+function getNativeJsonExportLayoutRules(node, fallbackRules) {
+  var _a;
+  return __spreadProps(__spreadValues({}, fallbackRules), {
+    stackGap: (_a = node.layout.itemSpacing) != null ? _a : fallbackRules.stackGap,
+    stackAlignment: getNativeJsonExportStackAlignment(node)
+  });
+}
+function getNativeJsonExportStackAlignment(node) {
+  if (node.layout.counterAxisAlignItems === "CENTER" || node.layout.counterAxisAlignItems === "BASELINE") {
+    return "center";
+  }
+  return "start";
+}
+function getEffectiveJsonExportRules(node, layoutRules) {
+  var _a;
+  const nodeRule = (_a = node.responsive) == null ? void 0 : _a.nodeRule;
+  if ((nodeRule == null ? void 0 : nodeRule.enabled) === true) {
+    return {
+      conversionDirection: nodeRule.conversionDirection,
+      rowToColumnMode: nodeRule.rowToColumnMode,
+      rowToColumnBreakpoint: nodeRule.rowToColumnBreakpoint,
+      stackGap: nodeRule.stackGap,
+      stackAlignment: nodeRule.stackAlignment
+    };
+  }
+  return {
+    conversionDirection: layoutRules.conversionDirection,
+    rowToColumnMode: layoutRules.rowToColumnMode,
+    rowToColumnBreakpoint: layoutRules.rowToColumnBreakpoint,
+    stackGap: layoutRules.stackGap,
+    stackAlignment: layoutRules.stackAlignment
+  };
+}
+function shouldFillJsonExportAxis(node, axis, defaultFill, parentLayoutMode = null, sourceParentLayoutMode = parentLayoutMode) {
+  const sizingMode = getJsonExportNodeAxisSizingForParent(node, axis, parentLayoutMode, sourceParentLayoutMode);
+  return sizingMode === "FILL" || sizingMode == null && defaultFill;
+}
+function getJsonExportNodeAxisSizingForParent(node, axis, parentLayoutMode, sourceParentLayoutMode) {
+  return getJsonExportNodeAxisSizing(
+    node,
+    getSourceAxisForTargetAxis(axis, parentLayoutMode, sourceParentLayoutMode),
+    sourceParentLayoutMode
+  );
+}
+function getJsonExportNodeAxisSizing(node, axis, parentLayoutMode = null) {
+  const layoutSizing = axis === "horizontal" ? node.layout.layoutSizingHorizontal : node.layout.layoutSizingVertical;
+  if (layoutSizing === "FILL" || layoutSizing === "HUG" || layoutSizing === "FIXED") {
+    return layoutSizing;
+  }
+  const axisSizing = axisMatchesPrimaryAxis(node, axis) ? node.layout.primaryAxisSizingMode : node.layout.counterAxisSizingMode;
+  if (axisSizing === "AUTO") {
+    return "HUG";
+  }
+  if (axisSizing === "FIXED") {
+    return "FIXED";
+  }
+  if (parentLayoutMode != null && node.layout.layoutAlign === "STRETCH" && axisMatchesCrossAxis(parentLayoutMode, axis)) {
+    return "FILL";
+  }
+  if (parentLayoutMode != null && typeof node.layout.layoutGrow === "number" && node.layout.layoutGrow > 0 && axisMatchesPrimaryParentAxis(parentLayoutMode, axis)) {
+    return "FILL";
+  }
+  return null;
+}
+function getJsonExportFontSize(fontSize, scale, layoutRules) {
+  const scaledSize = fontSize * scale;
+  if (layoutRules.textScaleMode === "preserve") {
+    return Math.max(8, scaledSize);
+  }
+  if (layoutRules.textScaleMode === "scale") {
+    return Math.max(layoutRules.minimumTextSize, scaledSize);
+  }
+  return Math.max(layoutRules.minimumTextSize, Math.min(fontSize, scaledSize));
+}
+function scaleJsonExportLineHeight(lineHeight, scale) {
+  const lineHeightObject = asJsonObject(lineHeight);
+  if (lineHeightObject != null && lineHeightObject.unit === "PIXELS" && typeof lineHeightObject.value === "number") {
+    return __spreadProps(__spreadValues({}, lineHeightObject), {
+      value: lineHeightObject.value * scale
+    });
+  }
+  return lineHeight;
+}
+function getJsonExportMainAxisAlign(node) {
+  return typeof node.layout.primaryAxisAlignItems === "string" ? node.layout.primaryAxisAlignItems : "MIN";
+}
+function getJsonExportCrossAxisAlign(node, layoutRules) {
+  if (typeof node.layout.counterAxisAlignItems === "string") {
+    return node.layout.counterAxisAlignItems;
+  }
+  if (layoutRules.stackAlignment === "center") {
+    return "CENTER";
+  }
+  return "MIN";
+}
+function getJsonExportDynamicMainAxisGap(justify, baseGap, mainSize, totalChildrenMainSize, childCount) {
+  return justify === "SPACE_BETWEEN" && childCount > 1 ? Math.max(baseGap, (mainSize - totalChildrenMainSize) / (childCount - 1)) : baseGap;
+}
+function getJsonExportMainAxisOffset(justify, mainSize, mainUsed) {
+  const remaining = Math.max(0, mainSize - mainUsed);
+  if (justify === "CENTER") {
+    return remaining / 2;
+  }
+  if (justify === "MAX") {
+    return remaining;
+  }
+  return 0;
+}
+function getJsonExportCrossAxisOffset(align, crossSize, childCrossSize) {
+  const remaining = Math.max(0, crossSize - childCrossSize);
+  if (align === "CENTER" || align === "BASELINE") {
+    return remaining / 2;
+  }
+  if (align === "MAX") {
+    return remaining;
+  }
+  return 0;
+}
+function getStaticSerializedLayout(node) {
+  return __spreadProps(__spreadValues({}, node.layout), {
+    isAutoLayout: false,
+    autoLayoutDirection: "NONE",
+    layoutMode: "NONE",
+    layoutAlign: "INHERIT",
+    layoutGrow: 0,
+    layoutSizingHorizontal: "FIXED",
+    layoutSizingVertical: "FIXED"
+  });
+}
+function createSerializedGeometry(x, y, width, height) {
+  const safeX = roundLayoutNumber(x);
+  const safeY = roundLayoutNumber(y);
+  const safeWidth = Math.max(1, roundLayoutNumber(width));
+  const safeHeight = Math.max(1, roundLayoutNumber(height));
+  const bounds = createBounds(safeX, safeY, safeWidth, safeHeight);
+  return {
+    x: safeX,
+    y: safeY,
+    width: safeWidth,
+    height: safeHeight,
+    rotation: 0,
+    absoluteBounds: bounds,
+    parentRelativeBounds: bounds,
+    rootRelativeBounds: bounds,
+    percentOfRoot: {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      right: 0,
+      bottom: 0
+    },
+    hierarchy: {
+      parentId: null,
+      depth: 0,
+      siblingIndex: 0,
+      siblingCount: 1
+    }
+  };
+}
+function withSerializedGeometry(node, x, y, width, height) {
+  const safeX = roundLayoutNumber(x);
+  const safeY = roundLayoutNumber(y);
+  const safeWidth = Math.max(1, roundLayoutNumber(width));
+  const safeHeight = Math.max(1, roundLayoutNumber(height));
+  const bounds = createBounds(safeX, safeY, safeWidth, safeHeight);
+  return __spreadProps(__spreadValues({}, node), {
+    geometry: __spreadProps(__spreadValues({}, node.geometry), {
+      x: safeX,
+      y: safeY,
+      width: safeWidth,
+      height: safeHeight,
+      absoluteBounds: bounds,
+      parentRelativeBounds: bounds,
+      rootRelativeBounds: bounds
+    })
+  });
+}
+async function createSceneNodeFromSerializedNode(node, isRoot = false) {
+  const sceneNode = await createBaseSceneNode(node);
+  applySerializedNodeProperties(sceneNode, node, isRoot);
+  if (hasChildren(sceneNode)) {
+    for (const child of node.children) {
+      const childNode = await createSceneNodeFromSerializedNode(child);
+      sceneNode.appendChild(childNode);
+    }
+  }
+  return sceneNode;
+}
+async function createBaseSceneNode(node) {
+  var _a;
+  if (node.type === "TEXT") {
+    const textNode = figma.createText();
+    await applySerializedText(textNode, node);
+    return textNode;
+  }
+  if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE" || node.type === "RESPONSIVE_GROUP" || ((_a = node.responsive) == null ? void 0 : _a.isVirtualGroup) === true || node.children.length > 0) {
+    return figma.createFrame();
+  }
+  if (node.type === "RECTANGLE") {
+    return figma.createRectangle();
+  }
+  return figma.createRectangle();
+}
+function applySerializedNodeProperties(sceneNode, node, isRoot = false) {
+  sceneNode.name = node.name;
+  sceneNode.visible = node.visible;
+  sceneNode.locked = node.locked;
+  sceneNode.x = node.geometry.x;
+  sceneNode.y = node.geometry.y;
+  if ("rotation" in sceneNode) {
+    sceneNode.rotation = node.geometry.rotation;
+  }
+  if (canResize(sceneNode)) {
+    sceneNode.resize(
+      Math.max(1, node.geometry.width),
+      Math.max(1, node.geometry.height)
+    );
+  }
+  if ("opacity" in sceneNode && typeof node.style.opacity === "number") {
+    sceneNode.opacity = clampNumber(node.style.opacity, 0, 1);
+  }
+  if ("fills" in sceneNode) {
+    const fills = toFigmaReadonlyArray(node.style.fills);
+    if (fills != null) {
+      sceneNode.fills = fills;
+    } else if (!isRoot) {
+      sceneNode.fills = [];
+    }
+  }
+  if ("strokes" in sceneNode) {
+    const strokes = toFigmaReadonlyArray(node.style.strokes);
+    if (strokes != null) {
+      sceneNode.strokes = strokes;
+    }
+  }
+  if ("strokeWeight" in sceneNode && typeof node.style.strokeWeight === "number") {
+    sceneNode.strokeWeight = node.style.strokeWeight;
+  }
+  if ("cornerRadius" in sceneNode && typeof node.style.cornerRadius === "number") {
+    ;
+    sceneNode.cornerRadius = node.style.cornerRadius;
+  }
+  if ("effects" in sceneNode) {
+    const effects = toFigmaReadonlyArray(node.style.effects);
+    if (effects != null) {
+      sceneNode.effects = effects;
+    }
+  }
+  applySerializedLayout(sceneNode, node);
+}
+async function applySerializedText(textNode, node) {
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+  const fontName = (_b = toFigmaFontName((_a = node.text) == null ? void 0 : _a.fontName)) != null ? _b : { family: "Inter", style: "Regular" };
+  await figma.loadFontAsync(fontName);
+  textNode.fontName = fontName;
+  textNode.characters = (_d = (_c = node.text) == null ? void 0 : _c.characters) != null ? _d : "";
+  if (typeof ((_e = node.text) == null ? void 0 : _e.fontSize) === "number") {
+    textNode.fontSize = node.text.fontSize;
+  }
+  if (((_f = node.text) == null ? void 0 : _f.textAlignHorizontal) === "LEFT" || ((_g = node.text) == null ? void 0 : _g.textAlignHorizontal) === "CENTER" || ((_h = node.text) == null ? void 0 : _h.textAlignHorizontal) === "RIGHT" || ((_i = node.text) == null ? void 0 : _i.textAlignHorizontal) === "JUSTIFIED") {
+    textNode.textAlignHorizontal = node.text.textAlignHorizontal;
+  }
+  if (((_j = node.text) == null ? void 0 : _j.textAlignVertical) === "TOP" || ((_k = node.text) == null ? void 0 : _k.textAlignVertical) === "CENTER" || ((_l = node.text) == null ? void 0 : _l.textAlignVertical) === "BOTTOM") {
+    textNode.textAlignVertical = node.text.textAlignVertical;
+  }
+  const lineHeight = toFigmaLineHeight((_m = node.text) == null ? void 0 : _m.lineHeight);
+  if (lineHeight != null) {
+    textNode.lineHeight = lineHeight;
+  }
+}
+function applySerializedLayout(sceneNode, node) {
+  var _a;
+  if (hasAutoLayout(sceneNode)) {
+    const layoutMode = getSerializedLayoutMode(node.layout.layoutMode);
+    setSerializedSceneLayoutMode(sceneNode, layoutMode);
+    if (layoutMode !== "NONE") {
+      sceneNode.itemSpacing = clampNumber((_a = node.layout.itemSpacing) != null ? _a : 0, 0, 1e3);
+      sceneNode.primaryAxisAlignItems = toFigmaAxisAlign(node.layout.primaryAxisAlignItems);
+      sceneNode.counterAxisAlignItems = toFigmaCounterAxisAlign(node.layout.counterAxisAlignItems);
+      sceneNode.primaryAxisSizingMode = toFigmaAxisSizing(node.layout.primaryAxisSizingMode);
+      sceneNode.counterAxisSizingMode = toFigmaAxisSizing(node.layout.counterAxisSizingMode);
+      const padding = node.layout.padding;
+      if (padding != null) {
+        sceneNode.paddingTop = padding.top;
+        sceneNode.paddingRight = padding.right;
+        sceneNode.paddingBottom = padding.bottom;
+        sceneNode.paddingLeft = padding.left;
+      }
+    }
+  }
+  if ("layoutAlign" in sceneNode && (node.layout.layoutAlign === "INHERIT" || node.layout.layoutAlign === "STRETCH")) {
+    sceneNode.layoutAlign = node.layout.layoutAlign;
+  }
+  if ("layoutGrow" in sceneNode && typeof node.layout.layoutGrow === "number") {
+    sceneNode.layoutGrow = node.layout.layoutGrow;
+  }
+  if ("layoutSizingHorizontal" in sceneNode && isFigmaLayoutSizingMode(node.layout.layoutSizingHorizontal)) {
+    sceneNode.layoutSizingHorizontal = node.layout.layoutSizingHorizontal;
+  }
+  if ("layoutSizingVertical" in sceneNode && isFigmaLayoutSizingMode(node.layout.layoutSizingVertical)) {
+    sceneNode.layoutSizingVertical = node.layout.layoutSizingVertical;
+  }
+}
+function getSerializedLayoutMode(value) {
+  if (value === "HORIZONTAL" || value === "VERTICAL" || value === "GRID") {
+    return value;
+  }
+  return "NONE";
+}
+function setSerializedSceneLayoutMode(sceneNode, layoutMode) {
+  if (layoutMode === "GRID") {
+    try {
+      ;
+      sceneNode.layoutMode = layoutMode;
+    } catch (_error) {
+      console.warn("This Figma runtime does not support GRID layout mode; created the node without Auto Layout grid.");
+      sceneNode.layoutMode = "NONE";
+    }
+    return;
+  }
+  sceneNode.layoutMode = layoutMode;
+}
+function getNextExportFrameX(width) {
+  const selectedNodes = figma.currentPage.selection;
+  if (selectedNodes.length > 0) {
+    return Math.max(...selectedNodes.map((node) => readNumber(node, "x", 0) + readNumber(node, "width", 0))) + 80;
+  }
+  return figma.viewport.center.x - width / 2;
+}
+function toFigmaReadonlyArray(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  return value;
+}
+function toFigmaFontName(value) {
+  const fontName = asJsonObject(value);
+  if (fontName == null || typeof fontName.family !== "string" || typeof fontName.style !== "string") {
+    return null;
+  }
+  return {
+    family: fontName.family,
+    style: fontName.style
+  };
+}
+function toFigmaLineHeight(value) {
+  const lineHeight = asJsonObject(value);
+  if (lineHeight == null || typeof lineHeight.unit !== "string") {
+    return null;
+  }
+  if (lineHeight.unit === "PIXELS" && typeof lineHeight.value === "number") {
+    return {
+      unit: "PIXELS",
+      value: lineHeight.value
+    };
+  }
+  if (lineHeight.unit === "PERCENT" && typeof lineHeight.value === "number") {
+    return {
+      unit: "PERCENT",
+      value: lineHeight.value
+    };
+  }
+  if (lineHeight.unit === "AUTO") {
+    return {
+      unit: "AUTO"
+    };
+  }
+  return null;
+}
+function toFigmaAxisAlign(value) {
+  if (value === "CENTER" || value === "MAX" || value === "SPACE_BETWEEN") {
+    return value;
+  }
+  return "MIN";
+}
+function toFigmaCounterAxisAlign(value) {
+  if (value === "CENTER" || value === "MAX" || value === "BASELINE") {
+    return value;
+  }
+  return "MIN";
+}
+function toFigmaAxisSizing(value) {
+  return value === "AUTO" ? "AUTO" : "FIXED";
+}
+function isFigmaLayoutSizingMode(value) {
+  return value === "FIXED" || value === "HUG" || value === "FILL";
+}
+function asJsonObject(value) {
+  return value != null && !Array.isArray(value) && typeof value === "object" ? value : null;
+}
+function isReplacementActive(rule, screenWidth) {
+  if (rule == null || rule.enabled !== true || rule.preset !== "hamburger") {
+    return false;
+  }
+  if (rule.trigger === "always") {
+    return true;
+  }
+  if (rule.trigger === "never") {
+    return false;
+  }
+  return screenWidth <= rule.breakpoint;
+}
+function clampReplacementDimension(value) {
+  return Math.min(1e4, Math.max(16, Math.round(value)));
+}
+function getSerializedReplacementDimensions(node, rule) {
+  var _a, _b;
+  const sizeSource = (_a = rule == null ? void 0 : rule.sizeSource) != null ? _a : "custom";
+  const size = sizeSource === "width" ? node.geometry.width : sizeSource === "height" ? node.geometry.height : (_b = rule == null ? void 0 : rule.width) != null ? _b : node.geometry.height;
+  const squareSize = clampReplacementDimension(size);
+  return {
+    width: squareSize,
+    height: squareSize
+  };
+}
+function axisMatchesPrimaryAxis(node, axis) {
+  return axis === "horizontal" ? node.layout.layoutMode === "HORIZONTAL" : node.layout.layoutMode === "VERTICAL";
+}
+function axisMatchesPrimaryParentAxis(parentLayoutMode, axis) {
+  return axis === "horizontal" ? parentLayoutMode === "HORIZONTAL" : parentLayoutMode === "VERTICAL";
+}
+function axisMatchesCrossAxis(parentLayoutMode, axis) {
+  return axis === "horizontal" ? parentLayoutMode === "VERTICAL" : parentLayoutMode === "HORIZONTAL";
+}
+function getSourceAxisForTargetAxis(axis, parentLayoutMode, sourceParentLayoutMode) {
+  if (parentLayoutMode == null || sourceParentLayoutMode == null || parentLayoutMode === sourceParentLayoutMode) {
+    return axis;
+  }
+  return axisMatchesPrimaryParentAxis(parentLayoutMode, axis) ? getParentAxis(sourceParentLayoutMode, "primary") : getParentAxis(sourceParentLayoutMode, "cross");
+}
+function getParentAxis(parentLayoutMode, role) {
+  if (role === "primary") {
+    return parentLayoutMode === "HORIZONTAL" ? "horizontal" : "vertical";
+  }
+  return parentLayoutMode === "HORIZONTAL" ? "vertical" : "horizontal";
+}
+function hasAutoLayout(node) {
+  return "layoutMode" in node;
+}
+function canResize(node) {
+  return "resize" in node && typeof node.resize === "function";
+}
+function getDeviceLabel(targetDevice) {
+  if (targetDevice === "mobile") {
+    return "Mobile";
+  }
+  if (targetDevice === "tablet") {
+    return "Tablet";
+  }
+  if (targetDevice === "desktop") {
+    return "Desktop";
+  }
+  return "Custom";
+}
+function serializeFrame(node) {
+  const rootBounds = getAbsoluteBounds(node);
+  return __spreadProps(__spreadValues({}, serializeNode({
+    node,
+    isRoot: true,
+    rootBounds,
+    parentBounds: null,
+    parentId: null,
+    depth: 0,
+    siblingIndex: 0,
+    siblingCount: 1
+  })), {
+    type: node.type,
+    schemaVersion: 1,
+    importedAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+function serializeNode({
+  node,
+  isRoot = false,
+  rootBounds,
+  parentBounds,
+  parentId,
+  depth,
+  siblingIndex,
+  siblingCount
+}) {
+  const absoluteBounds = getAbsoluteBounds(node);
+  const parentRelativeBounds = getRelativeBounds(absoluteBounds, parentBounds != null ? parentBounds : absoluteBounds);
+  const rootRelativeBounds = getRelativeBounds(absoluteBounds, rootBounds);
+  const percentOfParent = parentBounds == null ? void 0 : getPercentBounds(parentRelativeBounds, parentBounds);
+  const percentOfRoot = getPercentBounds(rootRelativeBounds, rootBounds);
+  return {
+    id: node.id,
+    name: node.name,
+    type: node.type,
+    responsive: serializeResponsiveMetadata(node, isRoot),
+    visible: readBoolean(node, "visible", true),
+    locked: readBoolean(node, "locked", false),
+    geometry: {
+      x: readNumber(node, "x", 0),
+      y: readNumber(node, "y", 0),
+      width: readNumber(node, "width", 0),
+      height: readNumber(node, "height", 0),
+      rotation: readNumber(node, "rotation", 0),
+      absoluteBounds,
+      parentRelativeBounds,
+      rootRelativeBounds,
+      percentOfParent,
+      percentOfRoot,
+      hierarchy: {
+        parentId,
+        depth,
+        siblingIndex,
+        siblingCount
+      }
+    },
+    layout: serializeLayout(node),
+    style: serializeStyle(node),
+    text: node.type === "TEXT" ? serializeText(node) : void 0,
+    children: hasChildren(node) ? node.children.map((child, index) => serializeNode({
+      node: child,
+      rootBounds,
+      parentBounds: absoluteBounds,
+      parentId: node.id,
+      depth: depth + 1,
+      siblingIndex: index,
+      siblingCount: node.children.length
+    })) : []
+  };
+}
+function serializeLayout(node) {
+  const layout = {
+    isAutoLayout: isAutoLayoutContainer(node)
+  };
+  if ("constraints" in node) {
+    layout.constraints = toJsonValue(node.constraints);
+  }
+  if ("layoutMode" in node) {
+    layout.layoutMode = node.layoutMode;
+    layout.autoLayoutDirection = node.layoutMode;
+  }
+  if ("layoutAlign" in node) {
+    layout.layoutAlign = node.layoutAlign;
+  }
+  if ("layoutGrow" in node) {
+    layout.layoutGrow = node.layoutGrow;
+  }
+  if ("layoutSizingHorizontal" in node) {
+    layout.layoutSizingHorizontal = node.layoutSizingHorizontal;
+  }
+  if ("layoutSizingVertical" in node) {
+    layout.layoutSizingVertical = node.layoutSizingVertical;
+  }
+  if ("itemSpacing" in node) {
+    layout.itemSpacing = node.itemSpacing;
+  }
+  if ("counterAxisSpacing" in node && node.counterAxisSpacing != null) {
+    layout.counterAxisSpacing = node.counterAxisSpacing;
+  }
+  if ("primaryAxisAlignItems" in node) {
+    layout.primaryAxisAlignItems = node.primaryAxisAlignItems;
+  }
+  if ("counterAxisAlignItems" in node) {
+    layout.counterAxisAlignItems = node.counterAxisAlignItems;
+  }
+  if ("layoutWrap" in node) {
+    layout.layoutWrap = node.layoutWrap;
+  }
+  if ("paddingTop" in node && "paddingRight" in node && "paddingBottom" in node && "paddingLeft" in node) {
+    layout.padding = {
+      top: node.paddingTop,
+      right: node.paddingRight,
+      bottom: node.paddingBottom,
+      left: node.paddingLeft
+    };
+  }
+  if ("primaryAxisSizingMode" in node) {
+    layout.primaryAxisSizingMode = node.primaryAxisSizingMode;
+  }
+  if ("counterAxisSizingMode" in node) {
+    layout.counterAxisSizingMode = node.counterAxisSizingMode;
+  }
+  return layout;
+}
+function serializeResponsiveMetadata(node, isRoot) {
+  const isAutoLayout = isAutoLayoutContainer(node);
+  return {
+    groupRole: isRoot ? "root" : void 0,
+    conversionRole: isAutoLayout ? "auto-layout-container" : "manual-layer",
+    acceptsChildren: hasChildren(node)
+  };
+}
+function serializeStyle(node) {
+  const style = {};
+  if ("opacity" in node) {
+    style.opacity = node.opacity;
+  }
+  if ("blendMode" in node) {
+    style.blendMode = node.blendMode;
+  }
+  if ("fills" in node && node.fills !== figma.mixed) {
+    style.fills = toJsonValue(node.fills);
+  }
+  if ("strokes" in node) {
+    style.strokes = toJsonValue(node.strokes);
+  }
+  if ("strokeWeight" in node && node.strokeWeight !== figma.mixed) {
+    style.strokeWeight = node.strokeWeight;
+  }
+  if ("cornerRadius" in node) {
+    style.cornerRadius = node.cornerRadius === figma.mixed ? "mixed" : node.cornerRadius;
+  }
+  if ("effects" in node) {
+    style.effects = toJsonValue(node.effects);
+  }
+  return style;
+}
+function serializeText(node) {
+  return {
+    characters: node.characters,
+    fontSize: node.fontSize === figma.mixed ? "mixed" : node.fontSize,
+    fontName: toJsonValue(node.fontName),
+    fontWeight: node.fontWeight === figma.mixed ? void 0 : node.fontWeight,
+    textAlignHorizontal: node.textAlignHorizontal,
+    textAlignVertical: node.textAlignVertical,
+    lineHeight: toJsonValue(node.lineHeight),
+    letterSpacing: toJsonValue(node.letterSpacing)
+  };
+}
+function isImportableFrameNode(node) {
+  return node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE";
+}
+function isAutoLayoutContainer(node) {
+  return "layoutMode" in node && node.layoutMode !== "NONE";
+}
+function hasChildren(node) {
+  return "children" in node;
+}
+function readNumber(node, key, fallback) {
+  const value = node[key];
+  return typeof value === "number" ? value : fallback;
+}
+function readBoolean(node, key, fallback) {
+  const value = node[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+function getAbsoluteBounds(node) {
+  var _a, _b, _c, _d;
+  const absoluteBoundingBox = "absoluteBoundingBox" in node ? node.absoluteBoundingBox : null;
+  const x = (_a = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.x) != null ? _a : readNumber(node, "x", 0);
+  const y = (_b = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.y) != null ? _b : readNumber(node, "y", 0);
+  const width = (_c = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.width) != null ? _c : readNumber(node, "width", 0);
+  const height = (_d = absoluteBoundingBox == null ? void 0 : absoluteBoundingBox.height) != null ? _d : readNumber(node, "height", 0);
+  return createBounds(x, y, width, height);
+}
+function getRelativeBounds(bounds, origin) {
+  return createBounds(
+    bounds.x - origin.x,
+    bounds.y - origin.y,
+    bounds.width,
+    bounds.height
+  );
+}
+function getPercentBounds(bounds, container) {
+  return {
+    x: toPercent(bounds.x, container.width),
+    y: toPercent(bounds.y, container.height),
+    width: toPercent(bounds.width, container.width),
+    height: toPercent(bounds.height, container.height),
+    right: toPercent(bounds.right, container.width),
+    bottom: toPercent(bounds.bottom, container.height)
+  };
+}
+function createBounds(x, y, width, height) {
+  const roundedX = roundLayoutNumber(x);
+  const roundedY = roundLayoutNumber(y);
+  const roundedWidth = roundLayoutNumber(width);
+  const roundedHeight = roundLayoutNumber(height);
+  return {
+    x: roundedX,
+    y: roundedY,
+    width: roundedWidth,
+    height: roundedHeight,
+    right: roundLayoutNumber(roundedX + roundedWidth),
+    bottom: roundLayoutNumber(roundedY + roundedHeight),
+    centerX: roundLayoutNumber(roundedX + roundedWidth / 2),
+    centerY: roundLayoutNumber(roundedY + roundedHeight / 2)
+  };
+}
+function toPercent(value, total) {
+  return total === 0 ? 0 : roundLayoutNumber(value / total * 100);
+}
+function roundLayoutNumber(value) {
+  return Math.round(value * 1e3) / 1e3;
+}
+function clampNumber(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+function toJsonValue(value) {
+  if (value === figma.mixed) {
+    return "mixed";
+  }
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonValue(item));
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, toJsonValue(entry)])
+    );
+  }
+  return String(value);
+}
+function sendToUi(message) {
+  figma.ui.postMessage(message);
+}
+var init_main = __esm({
+  "src/main.ts"() {
+    "use strict";
+    init_lib();
+  }
+});
+
+// <stdin>
+var modules = { "src/main.ts--default": (init_main(), __toCommonJS(main_exports))["default"] };
+var commandId = true ? "src/main.ts--default" : figma.command;
+modules[commandId]();

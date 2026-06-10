@@ -2,15 +2,17 @@ import { useState } from "preact/hooks"
 import { h } from "preact"
 import LayoutRules, { type LayoutRulesState } from "./LayoutRules"
 import type { FigmaSerializedFrame } from "../frameSchema"
+import logoSrc from "../../assets/logo_small.jpg"
 
 
 export type TargetDevice = "mobile" | "tablet" | "desktop" | "custom"
 
-const targetDeviceWidths: Record<Exclude<TargetDevice, "custom">, number> = {
-  mobile: 375,
+const targetDeviceWidths: Record<Exclude<TargetDevice, "custom" | "mobile">, number> = {
   tablet: 768,
   desktop: 1440
 }
+
+const mobileWidthScale = 0.8
 
 export type ConversionOption = {
   id: string
@@ -58,8 +60,14 @@ export function createDefaultConversionOptions(): ConversionOption[] {
 }
 
 export function getTargetDeviceWidth(targetDevice: TargetDevice, sourceWidth: number): number {
+  const safeSourceWidth = Math.max(1, Math.round(sourceWidth))
+
+  if (targetDevice === "mobile") {
+    return Math.max(1, Math.round(safeSourceWidth * mobileWidthScale))
+  }
+
   if (targetDevice === "custom") {
-    return Math.max(1, Math.round(sourceWidth))
+    return safeSourceWidth
   }
 
   return targetDeviceWidths[targetDevice]
@@ -67,6 +75,7 @@ export function getTargetDeviceWidth(targetDevice: TargetDevice, sourceWidth: nu
 
 export default function ResponsiveSidebar({
   importedFrame,
+  workingFrame,
   importError,
   jsonImportError,
   isJsonImportedFrame,
@@ -79,6 +88,7 @@ export default function ResponsiveSidebar({
   onGenerate
 }: {
   importedFrame: FigmaSerializedFrame | null
+  workingFrame: FigmaSerializedFrame | null
   importError: string
   jsonImportError: string
   isJsonImportedFrame: boolean
@@ -118,17 +128,19 @@ export default function ResponsiveSidebar({
   }
 
   function generateResponsiveFrame() {
-    if (importedFrame == null) {
+    const frameForGeneration = workingFrame ?? importedFrame
+
+    if (frameForGeneration == null) {
       return
     }
 
-    const importedWidth = Math.max(1, Math.round(importedFrame.geometry.width))
+    const importedWidth = Math.max(1, Math.round(importedFrame?.geometry.width ?? frameForGeneration.geometry.width))
     const targetWidth = getTargetDeviceWidth(targetDevice, importedWidth)
     const payload = {
       targetDevice,
       sourceWidth: importedWidth,
       screenWidth: targetWidth,
-      sourceFrame: isJsonImportedFrame ? null : importedFrame,
+      sourceFrame: isJsonImportedFrame ? null : frameForGeneration,
       layoutRules,
       options
     }
@@ -143,13 +155,13 @@ export default function ResponsiveSidebar({
         },
         "*"
       )
-    } else if (importedFrame != null) {
+    } else {
       parent.postMessage(
         {
           pluginMessage: {
             type: "create-export-frame-from-json",
             payload: {
-              frame: importedFrame,
+              frame: frameForGeneration,
               screenWidth: targetWidth,
               layoutRules
             }
@@ -173,23 +185,8 @@ export default function ResponsiveSidebar({
           frame={importedFrame}
           error={importError}
           onImport={importSelectedFrame}
-          onToggleJsonImport={() => setIsJsonImportOpen((current) => !current)}
           onClear={onClearFrame}
         />
-
-        {isJsonImportOpen && (
-          <JsonImportCard
-            value={jsonImportValue}
-            error={jsonImportError}
-            onChange={setJsonImportValue}
-            onImport={() => {
-              if (onImportJson(jsonImportValue)) {
-                setJsonImportValue("")
-                setIsJsonImportOpen(false)
-              }
-            }}
-          />
-        )}
 
         <StepTitle index={2} title="Target Device" className="mt-7" />
 
@@ -222,9 +219,9 @@ export default function ResponsiveSidebar({
         <button
           type="button"
           onClick={generateResponsiveFrame}
-          disabled={importedFrame == null}
+          disabled={workingFrame == null && importedFrame == null}
           class={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition ${
-            importedFrame == null
+            workingFrame == null && importedFrame == null
               ? "cursor-not-allowed bg-gray-200 text-gray-400"
               : "bg-[#0f766e] text-white hover:bg-[#115e59]"
           }`}
@@ -247,9 +244,12 @@ function SidebarHeader() {
   return (
     <header class="flex h-16 items-center justify-between border-b border-[#e5e7eb] px-5">
       <div class="flex items-center gap-3">
-        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f766e] text-sm font-bold text-white">
-          R
-        </div>
+        <img
+          src={logoSrc}
+          alt=""
+          aria-hidden="true"
+          class="h-9 w-9 shrink-0 rounded-xl object-cover"
+        />
 
         <div>
           <h1 class="text-sm font-bold text-gray-900">
@@ -298,13 +298,11 @@ function SourceFrameCard({
   frame,
   error,
   onImport,
-  onToggleJsonImport,
   onClear
 }: {
   frame: FigmaSerializedFrame | null
   error: string
   onImport: () => void
-  onToggleJsonImport: () => void
   onClear: () => void
 }) {
   return (
@@ -352,17 +350,6 @@ function SourceFrameCard({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onToggleJsonImport}
-        class="mt-2 w-full rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-gray-600 transition hover:border-gray-300 hover:bg-white hover:text-gray-900"
-      >
-        Import JSON 
-        <span class="bg-red-600 text-white mx-2">
-
-        "TEST DEV"
-        </span>
-      </button>
     </div>
   )
 }

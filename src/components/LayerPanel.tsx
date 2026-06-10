@@ -320,7 +320,9 @@ export default function LayerPanel({
         onFrameChange={onFrameChange}
       />
 
-      <div class="min-h-24 flex-1 overflow-auto p-3">
+      <div class={`shrink-0 overflow-auto p-3 ${
+        selectedNode == null ? "min-h-0 flex-1" : "max-h-[30%] min-h-28"
+      }`}>
         <LayerNode
           node={frame}
           depth={0}
@@ -348,7 +350,7 @@ export default function LayerPanel({
       )}
 
       {selectedNode != null && (
-        <div class="flex max-h-[72%] shrink-0 flex-col overflow-hidden border-t border-[#e5e7eb] bg-white">
+        <div class="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-[#e5e7eb] bg-white">
           <button
             type="button"
             onClick={() => setIsLayoutPanelOpen((current) => !current)}
@@ -369,7 +371,7 @@ export default function LayerPanel({
           </button>
 
           {isLayoutPanelOpen && (
-            <div class="min-h-0 flex-1 overflow-auto overscroll-contain pb-4">
+            <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pb-8">
               <FlexLayoutPanel
                 node={selectedNode}
                 parentLayoutMode={selectedParentLayoutMode}
@@ -675,8 +677,18 @@ function ResponsiveBehaviorPanel({
       </div>
 
       {!isContainer ? (
-        <div class="rounded-lg border border-[#e5e7eb] bg-gray-50 px-3 py-2 text-[11px] font-semibold text-gray-400">
-          Select a container layer
+        <div class="space-y-2">
+          <div class="rounded-lg border border-[#e5e7eb] bg-gray-50 px-3 py-2 text-[11px] font-semibold text-gray-400">
+            Select a container layer for layout conversion rules.
+          </div>
+
+          <ReplacementControl
+            node={node}
+            replacement={replacement}
+            isEnabled={isReplacementEnabled}
+            onChange={onReplacementChange}
+            onUpdate={updateReplacement}
+          />
         </div>
       ) : (
         <div class="space-y-2">
@@ -701,6 +713,14 @@ function ResponsiveBehaviorPanel({
 
           {isCustom && (
             <div class="space-y-2">
+              <ReplacementControl
+                node={node}
+                replacement={replacement}
+                isEnabled={isReplacementEnabled}
+                onChange={onReplacementChange}
+                onUpdate={updateReplacement}
+              />
+
               <LayerSegmentedControl
                 value={rule.conversionDirection}
                 options={[
@@ -749,68 +769,126 @@ function ResponsiveBehaviorPanel({
             </div>
           )}
 
-          <div class="rounded-lg border border-[#e5e7eb] bg-gray-50 p-2">
-            <p class="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-500">
-              Replacement
-            </p>
-
-            <LayerSegmentedControl
-              value={isReplacementEnabled ? "hamburger" : "off"}
-              options={[
-                { value: "off", label: "Off" },
-                { value: "hamburger", label: "Hamburger" }
-              ]}
-              onChange={(value) => {
-                if (value === "off") {
-                  onReplacementChange(undefined)
-                  return
-                }
-
-                onReplacementChange(createResponsiveReplacementRule(globalRules))
-              }}
+          {!isCustom && (
+            <ReplacementControl
+              node={node}
+              replacement={replacement}
+              isEnabled={isReplacementEnabled}
+              onChange={onReplacementChange}
+              onUpdate={updateReplacement}
             />
-
-            {isReplacementEnabled && (
-              <div class="mt-2 space-y-2">
-                <LayerSegmentedControl
-                  value={replacement.trigger}
-                  options={[
-                    { value: "auto", label: "Auto" },
-                    { value: "always", label: "Always" },
-                    { value: "never", label: "Never" }
-                  ]}
-                  onChange={(trigger) => updateReplacement({ trigger })}
-                />
-
-                <div class="grid grid-cols-3 gap-2">
-                  <LayerNumberField
-                    label="Max width"
-                    value={replacement.breakpoint}
-                    min={240}
-                    max={1600}
-                    onChange={(breakpoint) => updateReplacement({ breakpoint })}
-                  />
-                  <LayerNumberField
-                    label="W"
-                    value={replacement.width}
-                    min={16}
-                    max={240}
-                    onChange={(width) => updateReplacement({ width })}
-                  />
-                  <LayerNumberField
-                    label="H"
-                    value={replacement.height}
-                    min={16}
-                    max={240}
-                    onChange={(height) => updateReplacement({ height })}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       )}
     </section>
+  )
+}
+
+function ReplacementControl({
+  node,
+  replacement,
+  isEnabled,
+  onChange,
+  onUpdate
+}: {
+  node: FigmaSerializedNode
+  replacement: ResponsiveReplacementRule
+  isEnabled: boolean
+  onChange: (rule: ResponsiveReplacementRule | undefined) => void
+  onUpdate: (rule: Partial<ResponsiveReplacementRule>) => void
+}) {
+  const sizeSource = replacement.sizeSource ?? "custom"
+  const customSize = Math.round(replacement.width)
+  const resolvedSize = sizeSource === "width"
+    ? Math.round(node.geometry.width)
+    : sizeSource === "height"
+      ? Math.round(node.geometry.height)
+      : customSize
+
+  function updateSquareSize(size: number) {
+    onUpdate({
+      sizeSource: "custom",
+      width: size,
+      height: size
+    })
+  }
+
+  return (
+    <div class="rounded-lg border border-[#e5e7eb] bg-gray-50 p-2">
+      <p class="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+        Replacement
+      </p>
+
+      <LayerSegmentedControl
+        value={isEnabled ? "hamburger" : "off"}
+        options={[
+          { value: "off", label: "Off" },
+          { value: "hamburger", label: "Hamburger" }
+        ]}
+        onChange={(value) => {
+          if (value === "off") {
+            onChange(undefined)
+            return
+          }
+
+          onChange({
+            ...replacement,
+            enabled: true,
+            preset: "hamburger",
+            sizeSource: replacement.sizeSource ?? "height"
+          })
+        }}
+      />
+
+      {isEnabled && (
+        <div class="mt-2 space-y-2">
+          <LayerSegmentedControl
+            value={replacement.trigger}
+            options={[
+              { value: "auto", label: "Auto" },
+              { value: "always", label: "Always" },
+              { value: "never", label: "Never" }
+            ]}
+            onChange={(trigger) => onUpdate({ trigger })}
+          />
+
+          <LayerSegmentedControl
+            value={sizeSource}
+            options={[
+              { value: "height", label: "Height" },
+              { value: "width", label: "Width" },
+              { value: "custom", label: "Custom" }
+            ]}
+            onChange={(nextSizeSource) => {
+              if (nextSizeSource === "custom") {
+                updateSquareSize(customSize)
+                return
+              }
+
+              onUpdate({ sizeSource: nextSizeSource })
+            }}
+          />
+
+          <div class="grid grid-cols-2 gap-2">
+            <LayerNumberField
+              label="Max width"
+              value={replacement.breakpoint}
+              min={240}
+              max={1600}
+              onChange={(breakpoint) => onUpdate({ breakpoint })}
+            />
+            <LayerNumberField
+              label="Size"
+              value={resolvedSize}
+              min={16}
+              max={10000}
+              disabled={sizeSource !== "custom"}
+              onChange={updateSquareSize}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -831,6 +909,7 @@ function createResponsiveReplacementRule(globalRules: LayoutRulesState): Respons
     preset: "hamburger",
     trigger: "auto",
     breakpoint: globalRules.rowToColumnBreakpoint,
+    sizeSource: "height",
     width: 44,
     height: 44
   }
@@ -879,12 +958,14 @@ function LayerNumberField({
   value,
   min,
   max,
+  disabled = false,
   onChange
 }: {
   label: string
   value: number
   min: number
   max: number
+  disabled?: boolean
   onChange: (value: number) => void
 }) {
   return (
@@ -897,6 +978,7 @@ function LayerNumberField({
         value={String(value)}
         min={min}
         max={max}
+        disabled={disabled}
         onInput={(event) => {
           const nextValue = Number(event.currentTarget.value)
 
@@ -904,7 +986,11 @@ function LayerNumberField({
             onChange(Math.min(max, Math.max(min, nextValue)))
           }
         }}
-        class="h-9 w-full rounded-lg border border-[#e5e7eb] bg-white px-2 text-xs font-bold text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10"
+        class={`h-9 w-full rounded-lg border border-[#e5e7eb] px-2 text-xs font-bold outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10 ${
+          disabled
+            ? "bg-gray-100 text-gray-500"
+            : "bg-white text-gray-900"
+        }`}
       />
     </label>
   )

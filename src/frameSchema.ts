@@ -25,6 +25,7 @@ export type ResponsiveReplacementRule = {
   preset: "hamburger"
   trigger: ResponsiveConversionMode
   breakpoint: number
+  sizeSource?: "width" | "height" | "custom"
   width: number
   height: number
 }

@@ -1,6 +1,5 @@
 import { h } from "preact"
 import type { FigmaSerializedFrame } from "../frameSchema"
-import { normalizeFigmaJson } from "../normalizedFrameSchema"
 import type { ResponsiveGenerationSettings } from "./ResponsiveSidebar"
 
 export type ExportFrameSnapshot = {
@@ -21,20 +20,6 @@ export default function ExportFramePanel({
   isOpen,
   onClose
 }: ExportFramePanelProps) {
-  const normalizedFrame = snapshot == null ? null : normalizeFigmaJson(snapshot.frame)
-  const exportPayload = snapshot == null
-    ? null
-    : {
-        schemaVersion: 2,
-        exportType: "responsive-frame-plan",
-        appliedAt: snapshot.appliedAt,
-        target: {
-          device: snapshot.settings.targetDevice
-        },
-        appliedOptions: snapshot.settings.options.filter((option) => option.enabled),
-        root: normalizedFrame?.root
-      }
-
   return (
     <aside
       class={`fixed right-0 top-0 z-[60] flex h-screen w-[min(420px,100vw)] flex-col border-l border-[#e5e7eb] bg-white shadow-2xl transition-transform duration-300 ${
@@ -62,7 +47,7 @@ export default function ExportFramePanel({
         </button>
       </header>
 
-      {snapshot == null || exportPayload == null ? (
+      {snapshot == null ? (
         <div class="flex min-h-0 flex-1 items-center justify-center px-8 text-center">
           <div>
             <h3 class="text-sm font-bold text-gray-900">
@@ -104,21 +89,6 @@ export default function ExportFramePanel({
                   </div>
                 ))}
             </div>
-          </section>
-
-          <section class="bg-[#111827]">
-            <div class="flex h-10 items-center justify-between border-b border-white/10 px-4">
-              <h3 class="text-xs font-bold uppercase tracking-wide text-gray-300">
-                Export JSON
-              </h3>
-              <span class="text-xs text-gray-400">
-                snapshot
-              </span>
-            </div>
-
-            <pre class="max-h-[520px] overflow-auto p-4 text-xs leading-5 text-gray-100">
-              {JSON.stringify(exportPayload, null, 2)}
-            </pre>
           </section>
         </div>
       )}
