@@ -7,12 +7,12 @@ import logoSrc from "../../assets/logo_small.jpg"
 
 export type TargetDevice = "mobile" | "tablet" | "desktop" | "custom"
 
-const targetDeviceWidths: Record<Exclude<TargetDevice, "custom" | "mobile">, number> = {
-  tablet: 768,
-  desktop: 1440
+const targetDeviceWidths: Record<Exclude<TargetDevice, "custom" | "mobile" | "desktop">, number> = {
+  tablet: 768
 }
 
 const mobileWidthScale = 0.8
+const desktopWidthScale = 1.2
 
 export type ConversionOption = {
   id: string
@@ -68,6 +68,10 @@ export function getTargetDeviceWidth(targetDevice: TargetDevice, sourceWidth: nu
 
   if (targetDevice === "custom") {
     return safeSourceWidth
+  }
+
+  if (targetDevice === "desktop") {
+    return Math.max(1, Math.round(safeSourceWidth * desktopWidthScale))
   }
 
   return targetDeviceWidths[targetDevice]

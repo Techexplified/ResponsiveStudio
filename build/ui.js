@@ -427,9 +427,9 @@
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/c99efefe-8ee0-4c98-b5e8-ee93d3324d65/base.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/c92ba5c6-e0b8-4064-9950-21e630a8bd31/base.js
   var init_base = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/c99efefe-8ee0-4c98-b5e8-ee93d3324d65/base.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/c92ba5c6-e0b8-4064-9950-21e630a8bd31/base.js"() {
       if (document.getElementById("0a792085d1") === null) {
         const element = document.createElement("style");
         element.id = "0a792085d1";
@@ -578,9 +578,9 @@ svg {
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/e6bd7a33-79f4-47c5-8438-26ad5e1b9b82/output.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/09870b39-2e33-49b2-8fe8-36445973b5b0/output.js
   var init_output = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/e6bd7a33-79f4-47c5-8438-26ad5e1b9b82/output.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/09870b39-2e33-49b2-8fe8-36445973b5b0/output.js"() {
       if (document.getElementById("db1a1ac058") === null) {
         const element = document.createElement("style");
         element.id = "db1a1ac058";
@@ -2789,6 +2789,9 @@ svg {
     if (targetDevice === "custom") {
       return safeSourceWidth;
     }
+    if (targetDevice === "desktop") {
+      return Math.max(1, Math.round(safeSourceWidth * desktopWidthScale));
+    }
     return targetDeviceWidths[targetDevice];
   }
   function ResponsiveSidebar({
@@ -2991,7 +2994,7 @@ svg {
       );
     }));
   }
-  var targetDeviceWidths, mobileWidthScale;
+  var targetDeviceWidths, mobileWidthScale, desktopWidthScale;
   var init_ResponsiveSidebar = __esm({
     "src/components/ResponsiveSidebar.tsx"() {
       "use strict";
@@ -3000,10 +3003,10 @@ svg {
       init_LayoutRules();
       init_logo_small();
       targetDeviceWidths = {
-        tablet: 768,
-        desktop: 1440
+        tablet: 768
       };
       mobileWidthScale = 0.8;
+      desktopWidthScale = 1.2;
     }
   });
 
