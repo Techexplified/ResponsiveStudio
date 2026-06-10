@@ -16,6 +16,8 @@ type JsonExportLayoutRules = JsonExportPayload["layoutRules"]
 type EffectiveJsonExportRules = Omit<ResponsiveNodeRule, "enabled">
 type EffectiveGenerationRules = Omit<ResponsiveNodeRule, "enabled">
 type SerializedLayoutMode = "NONE" | "HORIZONTAL" | "VERTICAL" | "GRID"
+const serializedImageBytesKey = "__responsiveImageBytes"
+const serializedImageMimeKey = "__responsiveImageMime"
 type Bounds = {
   x: number
   y: number
@@ -83,12 +85,23 @@ function importSelectedFrame() {
     return
   }
 
-  sendToUi({
-    type: "frame-imported",
-    payload: serializeFrame(selectedNode)
-  })
+  serializeFrame(selectedNode)
+    .then((payload) => {
+      sendToUi({
+        type: "frame-imported",
+        payload
+      })
 
-  figma.notify(`Imported "${selectedNode.name}"`)
+      figma.notify(`Imported "${selectedNode.name}"`)
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "Could not import selected frame."
+
+      sendToUi({
+        type: "import-error",
+        message
+      })
+    })
 }
 
 async function generateResponsiveFrame(payload: GenerationPayload) {
@@ -106,7 +119,7 @@ async function generateResponsiveFrame(payload: GenerationPayload) {
     sourceWidth,
     screenWidth: referenceWidth
   }
-  const sourceFrame = payload.sourceFrame ?? serializeFrame(sourceNode)
+  const sourceFrame = payload.sourceFrame ?? await serializeFrame(sourceNode)
   const materializedFrame = materializeExportPreviewFrame({
     frame: sourceFrame,
     screenWidth: referenceWidth,
@@ -307,13 +320,17 @@ function createJsonExportReviewGroups(frame: FigmaSerializedFrame, reviewWidth: 
 
   return visibleChildren.map((child) => {
     const sourceBounds = child.geometry
-    const scale = contentWidth / Math.max(sourceBounds.width, 1)
+    const fitScale = contentWidth / Math.max(sourceBounds.width, 1)
+    const scale = hasSerializedImageFill(child) ? Math.min(1, fitScale) : fitScale
+    const width = hasSerializedImageFill(child)
+      ? Math.max(1, sourceBounds.width * scale)
+      : contentWidth
     const height = Math.max(1, getJsonExportNodeHeight(child, layoutRules, reviewWidth) * scale)
     const group = {
       node: child,
-      x: outerPadding,
+      x: outerPadding + Math.max(0, (contentWidth - width) / 2),
       y: nextY,
-      width: contentWidth,
+      width,
       height,
       sourceBounds,
       scale
@@ -358,6 +375,7 @@ function materializeJsonExportNode({
       }
   const style = {
     ...node.style,
+    fills: fitSerializedImageFills(node.style.fills),
     strokeWeight: typeof node.style.strokeWeight === "number"
       ? node.style.strokeWeight * scale
       : node.style.strokeWeight,
@@ -990,7 +1008,7 @@ function withSerializedGeometry<T extends FigmaSerializedNode>(
 async function createSceneNodeFromSerializedNode(node: FigmaSerializedNode, isRoot = false): Promise<SceneNode> {
   const sceneNode = await createBaseSceneNode(node)
 
-  applySerializedNodeProperties(sceneNode, node, isRoot)
+  await applySerializedNodeProperties(sceneNode, node, isRoot)
 
   if (hasChildren(sceneNode)) {
     for (const child of node.children) {
@@ -1030,7 +1048,7 @@ async function createBaseSceneNode(node: FigmaSerializedNode): Promise<SceneNode
   return figma.createRectangle()
 }
 
-function applySerializedNodeProperties(sceneNode: SceneNode, node: FigmaSerializedNode, isRoot = false) {
+async function applySerializedNodeProperties(sceneNode: SceneNode, node: FigmaSerializedNode, isRoot = false) {
   sceneNode.name = node.name
   sceneNode.visible = node.visible
   sceneNode.locked = node.locked
@@ -1053,7 +1071,7 @@ function applySerializedNodeProperties(sceneNode: SceneNode, node: FigmaSerializ
   }
 
   if ("fills" in sceneNode) {
-    const fills = toFigmaReadonlyArray<Paint>(node.style.fills)
+    const fills = await toFigmaPaintArray(node.style.fills)
 
     if (fills != null) {
       sceneNode.fills = fills
@@ -1063,7 +1081,7 @@ function applySerializedNodeProperties(sceneNode: SceneNode, node: FigmaSerializ
   }
 
   if ("strokes" in sceneNode) {
-    const strokes = toFigmaReadonlyArray<Paint>(node.style.strokes)
+    const strokes = await toFigmaPaintArray(node.style.strokes)
 
     if (strokes != null) {
       sceneNode.strokes = strokes
@@ -1194,6 +1212,55 @@ function toFigmaReadonlyArray<T>(value: FigmaJsonValue | undefined): ReadonlyArr
   }
 
   return value as unknown as ReadonlyArray<T>
+}
+
+async function toFigmaPaintArray(value: FigmaJsonValue | undefined): Promise<ReadonlyArray<Paint> | null> {
+  if (!Array.isArray(value)) {
+    return null
+  }
+
+  const paints = await Promise.all(value.map((paint) => toFigmaPaint(paint)))
+
+  return paints.filter((paint): paint is Paint => paint != null)
+}
+
+async function toFigmaPaint(value: FigmaJsonValue): Promise<Paint | null> {
+  const paint = asJsonObject(value)
+
+  if (paint == null) {
+    return null
+  }
+
+  const sanitizedPaint = stripSerializedImageMetadata(paint)
+
+  if (
+    paint.type === "IMAGE" &&
+    typeof paint[serializedImageBytesKey] === "string"
+  ) {
+    try {
+      const bytes = base64ToBytes(paint[serializedImageBytesKey])
+      const image = figma.createImage(bytes)
+
+      return {
+        ...sanitizedPaint,
+        imageHash: image.hash
+      } as unknown as Paint
+    } catch (_error) {
+      return sanitizedPaint as unknown as Paint
+    }
+  }
+
+  return sanitizedPaint as unknown as Paint
+}
+
+function stripSerializedImageMetadata(paint: { [key: string]: FigmaJsonValue }): { [key: string]: FigmaJsonValue } {
+  const {
+    [serializedImageBytesKey]: _bytes,
+    [serializedImageMimeKey]: _mime,
+    ...rest
+  } = paint
+
+  return rest
 }
 
 function toFigmaFontName(value: FigmaJsonValue | undefined): FontName | null {
@@ -2054,27 +2121,28 @@ function getDeviceLabel(targetDevice: GenerationPayload["targetDevice"]): string
   return "Custom"
 }
 
-function serializeFrame(node: ImportableFrameNode): FigmaSerializedFrame {
+async function serializeFrame(node: ImportableFrameNode): Promise<FigmaSerializedFrame> {
   const rootBounds = getAbsoluteBounds(node)
+  const serializedRoot = await serializeNode({
+    node,
+    isRoot: true,
+    rootBounds,
+    parentBounds: null,
+    parentId: null,
+    depth: 0,
+    siblingIndex: 0,
+    siblingCount: 1
+  })
 
   return {
-    ...serializeNode({
-      node,
-      isRoot: true,
-      rootBounds,
-      parentBounds: null,
-      parentId: null,
-      depth: 0,
-      siblingIndex: 0,
-      siblingCount: 1
-    }),
+    ...serializedRoot,
     type: node.type,
     schemaVersion: 1,
     importedAt: new Date().toISOString()
   }
 }
 
-function serializeNode({
+async function serializeNode({
   node,
   isRoot = false,
   rootBounds,
@@ -2092,7 +2160,7 @@ function serializeNode({
   depth: number
   siblingIndex: number
   siblingCount: number
-}): FigmaSerializedNode {
+}): Promise<FigmaSerializedNode> {
   const absoluteBounds = getAbsoluteBounds(node)
   const parentRelativeBounds = getRelativeBounds(absoluteBounds, parentBounds ?? absoluteBounds)
   const rootRelativeBounds = getRelativeBounds(absoluteBounds, rootBounds)
@@ -2100,6 +2168,17 @@ function serializeNode({
     ? undefined
     : getPercentBounds(parentRelativeBounds, parentBounds)
   const percentOfRoot = getPercentBounds(rootRelativeBounds, rootBounds)
+  const children = hasChildren(node)
+    ? await Promise.all(node.children.map((child, index) => serializeNode({
+        node: child,
+        rootBounds,
+        parentBounds: absoluteBounds,
+        parentId: node.id,
+        depth: depth + 1,
+        siblingIndex: index,
+        siblingCount: node.children.length
+      })))
+    : []
 
   return {
     id: node.id,
@@ -2127,19 +2206,9 @@ function serializeNode({
       }
     },
     layout: serializeLayout(node),
-    style: serializeStyle(node),
+    style: await serializeStyle(node),
     text: node.type === "TEXT" ? serializeText(node) : undefined,
-    children: hasChildren(node)
-      ? node.children.map((child, index) => serializeNode({
-          node: child,
-          rootBounds,
-          parentBounds: absoluteBounds,
-          parentId: node.id,
-          depth: depth + 1,
-          siblingIndex: index,
-          siblingCount: node.children.length
-        }))
-      : []
+    children
   }
 }
 
@@ -2228,7 +2297,7 @@ function serializeResponsiveMetadata(node: SceneNode, isRoot: boolean): FigmaSer
   }
 }
 
-function serializeStyle(node: SceneNode): FigmaSerializedNode["style"] {
+async function serializeStyle(node: SceneNode): Promise<FigmaSerializedNode["style"]> {
   const style: FigmaSerializedNode["style"] = {}
 
   if ("opacity" in node) {
@@ -2240,11 +2309,11 @@ function serializeStyle(node: SceneNode): FigmaSerializedNode["style"] {
   }
 
   if ("fills" in node && node.fills !== figma.mixed) {
-    style.fills = toJsonValue(node.fills)
+    style.fills = await serializePaintArray(node.fills)
   }
 
   if ("strokes" in node) {
-    style.strokes = toJsonValue(node.strokes)
+    style.strokes = await serializePaintArray(node.strokes)
   }
 
   if ("strokeWeight" in node && node.strokeWeight !== figma.mixed) {
@@ -2262,6 +2331,43 @@ function serializeStyle(node: SceneNode): FigmaSerializedNode["style"] {
   return style
 }
 
+async function serializePaintArray(paints: ReadonlyArray<Paint>): Promise<FigmaJsonValue> {
+  const serializedPaints = await Promise.all(paints.map((paint) => serializePaint(paint)))
+
+  return serializedPaints
+}
+
+async function serializePaint(paint: Paint): Promise<FigmaJsonValue> {
+  const serializedPaint = toJsonValue(paint)
+
+  if (paint.type !== "IMAGE" || typeof paint.imageHash !== "string") {
+    return serializedPaint
+  }
+
+  const record = asJsonObject(serializedPaint)
+
+  if (record == null) {
+    return serializedPaint
+  }
+
+  try {
+    const image = figma.getImageByHash(paint.imageHash)
+    if (image == null) {
+      return serializedPaint
+    }
+
+    const bytes = await image.getBytesAsync()
+
+    return {
+      ...record,
+      [serializedImageBytesKey]: bytesToBase64(bytes),
+      [serializedImageMimeKey]: getImageMimeType(bytes)
+    }
+  } catch (_error) {
+    return serializedPaint
+  }
+}
+
 function serializeText(node: TextNode): FigmaSerializedNode["text"] {
   return {
     characters: node.characters,
@@ -2273,6 +2379,39 @@ function serializeText(node: TextNode): FigmaSerializedNode["text"] {
     lineHeight: toJsonValue(node.lineHeight),
     letterSpacing: toJsonValue(node.letterSpacing)
   }
+}
+
+function hasSerializedImageFill(node: FigmaSerializedNode): boolean {
+  return Array.isArray(node.style.fills) && node.style.fills.some((paint) => {
+    const record = asJsonObject(paint)
+
+    return record?.type === "IMAGE"
+  })
+}
+
+function fitSerializedImageFills(value: FigmaJsonValue | undefined): FigmaJsonValue | undefined {
+  if (!Array.isArray(value)) {
+    return value
+  }
+
+  return value.map((paint) => {
+    const record = asJsonObject(paint)
+
+    if (record?.type !== "IMAGE") {
+      return paint
+    }
+
+    const {
+      imageTransform: _imageTransform,
+      cropTransform: _cropTransform,
+      ...rest
+    } = record
+
+    return {
+      ...rest,
+      scaleMode: "FIT"
+    }
+  })
 }
 
 function isImportableFrameNode(node: BaseNode): node is ImportableFrameNode {
@@ -2385,6 +2524,55 @@ function toJsonValue(value: unknown): FigmaJsonValue {
   }
 
   return String(value)
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ""
+  const chunkSize = 0x8000
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize)
+
+    binary += String.fromCharCode(...chunk)
+  }
+
+  return btoa(binary)
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+
+  return bytes
+}
+
+function getImageMimeType(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg"
+  }
+
+  if (
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return "image/png"
+  }
+
+  if (
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46
+  ) {
+    return "image/gif"
+  }
+
+  return "image/png"
 }
 
 function sendToUi(message: PluginToUiMessage) {

@@ -7,11 +7,13 @@ import type { FigmaSerializedFrame, FigmaSerializedNode, ResponsiveNodeRule } fr
 import {
   findNode,
   getCornerRadius,
+  getImageFillDataUrl,
   getLayerKind,
   getSolidFillColor,
   getTextFontFamily,
   getTextFontWeight,
   getTextHorizontalAlign,
+  getTextLetterSpacing,
   getTextLineHeight,
   getTextVerticalJustify,
   isVirtualGroup,
@@ -164,7 +166,7 @@ function GeneratedPreview({
     availableWidth / Math.max(reviewWidth, 1),
     availableHeight / Math.max(reviewHeight, 1)
   )
-  const canvasScale = Math.min(1, Math.max(0.1, fitScale))
+  const canvasScale = Math.min(1, Math.max(0.02, fitScale))
   const canvasWidth = Math.max(1, reviewWidth * canvasScale)
   const canvasHeight = Math.max(1, reviewHeight * canvasScale)
   const isFrameSelected = selectedNodeId === frame.id
@@ -256,7 +258,7 @@ function GeneratedPreview({
                   </button>
                 )}
                 <span class="rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[10px] font-bold text-gray-500">
-                  {Math.round(canvasScale * 100)}%
+                  {formatZoomPercent(canvasScale)}
                 </span>
               </div>
             </div>
@@ -297,6 +299,8 @@ function GeneratedPreview({
                       node={group.node}
                       origin={group.sourceBounds}
                       scale={group.scale * canvasScale}
+                      responsiveScale={group.scale}
+                      canvasScale={canvasScale}
                       layoutRules={layoutRules}
                       reviewWidth={reviewWidth}
                       selectedNodeId={selectedNodeId}
@@ -318,6 +322,8 @@ function ResponsiveReviewNode({
   node,
   origin,
   scale,
+  responsiveScale,
+  canvasScale,
   layoutRules,
   reviewWidth,
   selectedNodeId,
@@ -327,6 +333,8 @@ function ResponsiveReviewNode({
   node: FigmaSerializedNode
   origin: Pick<NodeBounds, "x" | "y">
   scale: number
+  responsiveScale: number
+  canvasScale: number
   layoutRules: LayoutRulesState
   reviewWidth: number
   selectedNodeId: string | null
@@ -373,6 +381,8 @@ function ResponsiveReviewNode({
             node={child.node}
             origin={{ x: 0, y: 0 }}
             scale={scale}
+            responsiveScale={responsiveScale}
+            canvasScale={canvasScale}
             layoutRules={layoutRules}
             reviewWidth={reviewWidth}
             selectedNodeId={selectedNodeId}
@@ -385,8 +395,9 @@ function ResponsiveReviewNode({
   }
 
   const fillColor = getSolidFillColor(renderNode.style.fills)
+  const imageFill = getImageFillDataUrl(renderNode.style.fills)
   const isTextNode = renderNode.text != null
-  const backgroundColor = isTextNode ? undefined : fillColor
+  const backgroundColor = isTextNode || imageFill != null ? undefined : fillColor
   const textColor = isTextNode ? fillColor : undefined
   const borderColor = getSolidFillColor(renderNode.style.strokes)
   const borderWidth = borderColor == null
@@ -415,6 +426,10 @@ function ResponsiveReviewNode({
         height: `${renderedHeight * scale}px`,
         opacity: renderNode.style.opacity,
         backgroundColor,
+        backgroundImage: imageFill == null ? undefined : `url(${imageFill})`,
+        backgroundPosition: imageFill == null ? undefined : "center",
+        backgroundRepeat: imageFill == null ? undefined : "no-repeat",
+        backgroundSize: imageFill == null ? undefined : "contain",
         borderColor,
         borderStyle: borderColor == null ? undefined : "solid",
         borderWidth: `${borderWidth}px`,
@@ -433,11 +448,12 @@ function ResponsiveReviewNode({
             alignItems: "stretch",
             justifyContent: getTextVerticalJustify(renderNode),
             fontSize: typeof renderNode.text.fontSize === "number"
-              ? `${getResponsiveFontSize(renderNode.text.fontSize, scale, layoutRules)}px`
+              ? `${getResponsiveFontSize(renderNode.text.fontSize, responsiveScale, layoutRules) * canvasScale}px`
               : undefined,
             fontFamily: getTextFontFamily(renderNode),
             fontWeight: getTextFontWeight(renderNode),
             lineHeight: layoutRules.tightenLineHeight ? 1.15 : getTextLineHeight(renderNode, scale),
+            letterSpacing: getTextLetterSpacing(renderNode, scale),
             color: textColor ?? "#1f2937",
             textAlign: getTextHorizontalAlign(renderNode),
             whiteSpace: "pre-wrap",
@@ -454,6 +470,8 @@ function ResponsiveReviewNode({
           node={child.node}
           origin={{ x: 0, y: 0 }}
           scale={scale}
+          responsiveScale={responsiveScale}
+          canvasScale={canvasScale}
           layoutRules={layoutRules}
           reviewWidth={reviewWidth}
           selectedNodeId={selectedNodeId}
@@ -899,13 +917,17 @@ function createExportReviewGroups(frame: FigmaSerializedFrame, reviewWidth: numb
 
   return visibleChildren.map((child) => {
     const sourceBounds = child.geometry
-    const scale = contentWidth / Math.max(sourceBounds.width, 1)
+    const fitScale = contentWidth / Math.max(sourceBounds.width, 1)
+    const scale = getImageFillDataUrl(child.style.fills) == null ? fitScale : Math.min(1, fitScale)
+    const width = getImageFillDataUrl(child.style.fills) == null
+      ? contentWidth
+      : Math.max(1, sourceBounds.width * scale)
     const height = Math.max(1, getResponsiveNodeHeight(child, layoutRules, reviewWidth) * scale)
     const group = {
       node: child,
-      x: outerPadding,
+      x: outerPadding + Math.max(0, (contentWidth - width) / 2),
       y: nextY,
-      width: contentWidth,
+      width,
       height,
       sourceBounds,
       scale
@@ -1399,4 +1421,12 @@ function getDeviceLabel(targetDevice: TargetDevice): string {
   }
 
   return "Custom"
+}
+
+function formatZoomPercent(scale: number): string {
+  const percent = scale * 100
+
+  return percent < 10
+    ? `${Math.round(percent * 10) / 10}%`
+    : `${Math.round(percent)}%`
 }

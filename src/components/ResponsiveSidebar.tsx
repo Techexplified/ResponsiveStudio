@@ -25,6 +25,7 @@ export type ResponsiveGenerationSettings = {
   targetDevice: TargetDevice
   sourceWidth: number
   screenWidth: number
+  customScale?: number
   sourceFrame: FigmaSerializedFrame | null
   layoutRules: LayoutRulesState
   options: ConversionOption[]
@@ -59,7 +60,7 @@ export function createDefaultConversionOptions(): ConversionOption[] {
   ]
 }
 
-export function getTargetDeviceWidth(targetDevice: TargetDevice, sourceWidth: number): number {
+export function getTargetDeviceWidth(targetDevice: TargetDevice, sourceWidth: number, customScale = 1): number {
   const safeSourceWidth = Math.max(1, Math.round(sourceWidth))
 
   if (targetDevice === "mobile") {
@@ -67,7 +68,7 @@ export function getTargetDeviceWidth(targetDevice: TargetDevice, sourceWidth: nu
   }
 
   if (targetDevice === "custom") {
-    return safeSourceWidth
+    return Math.max(1, Math.round(safeSourceWidth * customScale))
   }
 
   if (targetDevice === "desktop") {
@@ -84,8 +85,10 @@ export default function ResponsiveSidebar({
   jsonImportError,
   isJsonImportedFrame,
   targetDevice,
+  customScale,
   layoutRules,
   onTargetDeviceChange,
+  onCustomScaleChange,
   onLayoutRulesChange,
   onClearFrame,
   onImportJson,
@@ -97,8 +100,10 @@ export default function ResponsiveSidebar({
   jsonImportError: string
   isJsonImportedFrame: boolean
   targetDevice: TargetDevice
+  customScale: number
   layoutRules: LayoutRulesState
   onTargetDeviceChange: (value: TargetDevice) => void
+  onCustomScaleChange: (value: number) => void
   onLayoutRulesChange: (value: LayoutRulesState) => void
   onClearFrame: () => void
   onImportJson: (value: string) => boolean
@@ -139,11 +144,12 @@ export default function ResponsiveSidebar({
     }
 
     const importedWidth = Math.max(1, Math.round(importedFrame?.geometry.width ?? frameForGeneration.geometry.width))
-    const targetWidth = getTargetDeviceWidth(targetDevice, importedWidth)
+    const targetWidth = getTargetDeviceWidth(targetDevice, importedWidth, customScale)
     const payload = {
       targetDevice,
       sourceWidth: importedWidth,
       screenWidth: targetWidth,
+      customScale: targetDevice === "custom" ? customScale : undefined,
       sourceFrame: isJsonImportedFrame ? null : frameForGeneration,
       layoutRules,
       options
@@ -198,6 +204,14 @@ export default function ResponsiveSidebar({
           value={targetDevice}
           onChange={onTargetDeviceChange}
         />
+
+        {targetDevice === "custom" && (
+          <CustomScaleControl
+            sourceWidth={getImportedFrameWidth(workingFrame ?? importedFrame)}
+            scale={customScale}
+            onChange={onCustomScaleChange}
+          />
+        )}
 
         <StepTitle index={3} title="Layout Rules" className="mt-7" />
 
@@ -460,6 +474,58 @@ function DeviceSelector({
       })}
     </div>
   )
+}
+
+function CustomScaleControl({
+  sourceWidth,
+  scale,
+  onChange
+}: {
+  sourceWidth: number
+  scale: number
+  onChange: (value: number) => void
+}) {
+  const scalePercent = Math.round(scale * 100)
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale))
+
+  return (
+    <div class="mt-3 rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p class="text-xs font-bold text-gray-900">
+            Custom scale
+          </p>
+          <p class="mt-0.5 text-[11px] text-gray-500">
+            {targetWidth}px target width
+          </p>
+        </div>
+
+        <span class="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-2 py-1 text-xs font-bold text-gray-700">
+          {scalePercent}%
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min={25}
+        max={200}
+        step={5}
+        value={String(scalePercent)}
+        onInput={(event) => onChange(Number(event.currentTarget.value) / 100)}
+        class="h-2 w-full cursor-pointer accent-[#0f766e]"
+      />
+
+      <div class="mt-2 flex justify-between text-[10px] font-semibold text-gray-400">
+        <span>25%</span>
+        <span>100%</span>
+        <span>200%</span>
+      </div>
+    </div>
+  )
+}
+
+function getImportedFrameWidth(frame: FigmaSerializedFrame | null): number {
+  return Math.max(1, Math.round(frame?.geometry.width ?? 1))
 }
 
 function OptionRow({

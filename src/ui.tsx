@@ -21,6 +21,7 @@ function Plugin() {
   const [frameSource, setFrameSource] = useState<"figma" | "json" | null>(null)
   const [importError, setImportError] = useState("")
   const [targetDevice, setTargetDevice] = useState<TargetDevice>("mobile")
+  const [customScale, setCustomScale] = useState(1)
   const [layoutRules, setLayoutRules] = useState<LayoutRulesState>(defaultLayoutRules)
   const [exportSnapshot, setExportSnapshot] = useState<ExportFrameSnapshot | null>(null)
   const [isExportPanelOpen, setIsExportPanelOpen] = useState(false)
@@ -88,7 +89,11 @@ function Plugin() {
           settings: {
             ...currentSnapshot.settings,
             sourceWidth: importedWidth,
-            screenWidth: getTargetDeviceWidth(currentSnapshot.settings.targetDevice, importedWidth)
+            screenWidth: getTargetDeviceWidth(
+              currentSnapshot.settings.targetDevice,
+              importedWidth,
+              currentSnapshot.settings.customScale ?? customScale
+            )
           },
           frame: cloneFrame(nextFrame)
         })
@@ -96,6 +101,7 @@ function Plugin() {
 
   function handleGenerate(settings: ResponsiveGenerationSettings) {
     setTargetDevice(settings.targetDevice)
+    setCustomScale(settings.customScale ?? customScale)
     setLayoutRules(settings.layoutRules)
 
     if (workingFrame == null) {
@@ -121,13 +127,15 @@ function Plugin() {
 
     const nextTargetDevice = result.targetDevice ?? targetDevice
     const importedWidth = getImportedFrameWidth(result.frame)
-    const referenceWidth = getTargetDeviceWidth(nextTargetDevice, importedWidth)
+    const nextCustomScale = nextTargetDevice === "custom" ? result.customScale ?? customScale : 1
+    const referenceWidth = getTargetDeviceWidth(nextTargetDevice, importedWidth, nextCustomScale)
     const nextLayoutRules = result.layoutRules ?? layoutRules
     const nextOptions = result.options ?? createDefaultConversionOptions()
     const settings: ResponsiveGenerationSettings = {
       targetDevice: nextTargetDevice,
       sourceWidth: importedWidth,
       screenWidth: referenceWidth,
+      customScale: nextTargetDevice === "custom" ? nextCustomScale : undefined,
       sourceFrame: null,
       layoutRules: nextLayoutRules,
       options: nextOptions
@@ -141,6 +149,7 @@ function Plugin() {
     setUndoStack([])
     setRedoStack([])
     setTargetDevice(nextTargetDevice)
+    setCustomScale(nextCustomScale)
     setLayoutRules(nextLayoutRules)
     setExportSnapshot({
       id: `json-import-${Date.now()}`,
@@ -195,8 +204,10 @@ function Plugin() {
         jsonImportError={jsonImportError}
         isJsonImportedFrame={frameSource === "json"}
         targetDevice={targetDevice}
+        customScale={customScale}
         layoutRules={layoutRules}
         onTargetDeviceChange={setTargetDevice}
+        onCustomScaleChange={setCustomScale}
         onLayoutRulesChange={setLayoutRules}
         onClearFrame={clearImportedFrame}
         onImportJson={importJson}
@@ -206,7 +217,7 @@ function Plugin() {
         sourceFrame={importedFrame}
         frame={workingFrame}
         targetDevice={targetDevice}
-        screenWidth={getTargetDeviceWidth(targetDevice, getImportedFrameWidth(importedFrame))}
+        screenWidth={getTargetDeviceWidth(targetDevice, getImportedFrameWidth(importedFrame), customScale)}
         layoutRules={layoutRules}
         canUndo={undoStack.length > 0}
         canRedo={redoStack.length > 0}
@@ -230,6 +241,7 @@ type JsonImportResult =
       frame: FigmaSerializedFrame
       appliedAt?: string
       targetDevice?: TargetDevice
+      customScale?: number
       layoutRules?: LayoutRulesState
       options?: ConversionOption[]
     }
@@ -273,6 +285,7 @@ function parseJsonImport(value: string): JsonImportResult {
     frame: denormalizeFigmaJson(frameResult.value),
     appliedAt: readString(root.appliedAt),
     targetDevice: readTargetDevice(settings?.targetDevice ?? target?.device),
+    customScale: readOptionalBoundedNumber(settings?.customScale ?? target?.scale, 0.25, 2),
     layoutRules: readLayoutRules(settings?.layoutRules),
     options: readConversionOptions(settings?.options ?? root.appliedOptions)
   }
@@ -396,6 +409,12 @@ function readBoundedNumber(value: unknown, fallback: number, min: number, max: n
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, value))
     : fallback
+}
+
+function readOptionalBoundedNumber(value: unknown, min: number, max: number): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : undefined
 }
 
 function readString(value: unknown): string | undefined {

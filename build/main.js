@@ -19,6 +19,19 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __restKey = (key) => typeof key === "symbol" ? key : key + "";
+var __objRest = (source, exclude) => {
+  var target = {};
+  for (var prop in source)
+    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+      target[prop] = source[prop];
+  if (source != null && __getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(source)) {
+      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+        target[prop] = source[prop];
+    }
+  return target;
+};
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -111,11 +124,19 @@ function importSelectedFrame() {
     });
     return;
   }
-  sendToUi({
-    type: "frame-imported",
-    payload: serializeFrame(selectedNode)
+  serializeFrame(selectedNode).then((payload) => {
+    sendToUi({
+      type: "frame-imported",
+      payload
+    });
+    figma.notify(`Imported "${selectedNode.name}"`);
+  }).catch((error) => {
+    const message = error instanceof Error ? error.message : "Could not import selected frame.";
+    sendToUi({
+      type: "import-error",
+      message
+    });
   });
-  figma.notify(`Imported "${selectedNode.name}"`);
 }
 async function generateResponsiveFrame(payload) {
   var _a;
@@ -130,7 +151,7 @@ async function generateResponsiveFrame(payload) {
     sourceWidth,
     screenWidth: referenceWidth
   });
-  const sourceFrame = (_a = payload.sourceFrame) != null ? _a : serializeFrame(sourceNode);
+  const sourceFrame = (_a = payload.sourceFrame) != null ? _a : await serializeFrame(sourceNode);
   const materializedFrame = materializeExportPreviewFrame({
     frame: sourceFrame,
     screenWidth: referenceWidth,
@@ -228,13 +249,15 @@ function createJsonExportReviewGroups(frame, reviewWidth, layoutRules) {
   let nextY = outerPadding;
   return visibleChildren.map((child) => {
     const sourceBounds = child.geometry;
-    const scale = contentWidth / Math.max(sourceBounds.width, 1);
+    const fitScale = contentWidth / Math.max(sourceBounds.width, 1);
+    const scale = hasSerializedImageFill(child) ? Math.min(1, fitScale) : fitScale;
+    const width = hasSerializedImageFill(child) ? Math.max(1, sourceBounds.width * scale) : contentWidth;
     const height = Math.max(1, getJsonExportNodeHeight(child, layoutRules, reviewWidth) * scale);
     const group = {
       node: child,
-      x: outerPadding,
+      x: outerPadding + Math.max(0, (contentWidth - width) / 2),
       y: nextY,
-      width: contentWidth,
+      width,
       height,
       sourceBounds,
       scale
@@ -260,6 +283,7 @@ function materializeJsonExportNode({
     lineHeight: scaleJsonExportLineHeight(node.text.lineHeight, scale)
   });
   const style = __spreadProps(__spreadValues({}, node.style), {
+    fills: fitSerializedImageFills(node.style.fills),
     strokeWeight: typeof node.style.strokeWeight === "number" ? node.style.strokeWeight * scale : node.style.strokeWeight,
     cornerRadius: typeof node.style.cornerRadius === "number" ? node.style.cornerRadius * scale : node.style.cornerRadius
   });
@@ -712,7 +736,7 @@ function withSerializedGeometry(node, x, y, width, height) {
 }
 async function createSceneNodeFromSerializedNode(node, isRoot = false) {
   const sceneNode = await createBaseSceneNode(node);
-  applySerializedNodeProperties(sceneNode, node, isRoot);
+  await applySerializedNodeProperties(sceneNode, node, isRoot);
   if (hasChildren(sceneNode)) {
     for (const child of node.children) {
       const childNode = await createSceneNodeFromSerializedNode(child);
@@ -736,7 +760,7 @@ async function createBaseSceneNode(node) {
   }
   return figma.createRectangle();
 }
-function applySerializedNodeProperties(sceneNode, node, isRoot = false) {
+async function applySerializedNodeProperties(sceneNode, node, isRoot = false) {
   sceneNode.name = node.name;
   sceneNode.visible = node.visible;
   sceneNode.locked = node.locked;
@@ -755,7 +779,7 @@ function applySerializedNodeProperties(sceneNode, node, isRoot = false) {
     sceneNode.opacity = clampNumber(node.style.opacity, 0, 1);
   }
   if ("fills" in sceneNode) {
-    const fills = toFigmaReadonlyArray(node.style.fills);
+    const fills = await toFigmaPaintArray(node.style.fills);
     if (fills != null) {
       sceneNode.fills = fills;
     } else if (!isRoot) {
@@ -763,7 +787,7 @@ function applySerializedNodeProperties(sceneNode, node, isRoot = false) {
     }
   }
   if ("strokes" in sceneNode) {
-    const strokes = toFigmaReadonlyArray(node.style.strokes);
+    const strokes = await toFigmaPaintArray(node.style.strokes);
     if (strokes != null) {
       sceneNode.strokes = strokes;
     }
@@ -867,6 +891,42 @@ function toFigmaReadonlyArray(value) {
     return null;
   }
   return value;
+}
+async function toFigmaPaintArray(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const paints = await Promise.all(value.map((paint) => toFigmaPaint(paint)));
+  return paints.filter((paint) => paint != null);
+}
+async function toFigmaPaint(value) {
+  const paint = asJsonObject(value);
+  if (paint == null) {
+    return null;
+  }
+  const sanitizedPaint = stripSerializedImageMetadata(paint);
+  if (paint.type === "IMAGE" && typeof paint[serializedImageBytesKey] === "string") {
+    try {
+      const bytes = base64ToBytes(paint[serializedImageBytesKey]);
+      const image = figma.createImage(bytes);
+      return __spreadProps(__spreadValues({}, sanitizedPaint), {
+        imageHash: image.hash
+      });
+    } catch (_error) {
+      return sanitizedPaint;
+    }
+  }
+  return sanitizedPaint;
+}
+function stripSerializedImageMetadata(paint) {
+  const _a = paint, {
+    [serializedImageBytesKey]: _bytes,
+    [serializedImageMimeKey]: _mime
+  } = _a, rest = __objRest(_a, [
+    __restKey(serializedImageBytesKey),
+    __restKey(serializedImageMimeKey)
+  ]);
+  return rest;
 }
 function toFigmaFontName(value) {
   const fontName = asJsonObject(value);
@@ -987,9 +1047,9 @@ function getDeviceLabel(targetDevice) {
   }
   return "Custom";
 }
-function serializeFrame(node) {
+async function serializeFrame(node) {
   const rootBounds = getAbsoluteBounds(node);
-  return __spreadProps(__spreadValues({}, serializeNode({
+  const serializedRoot = await serializeNode({
     node,
     isRoot: true,
     rootBounds,
@@ -998,13 +1058,14 @@ function serializeFrame(node) {
     depth: 0,
     siblingIndex: 0,
     siblingCount: 1
-  })), {
+  });
+  return __spreadProps(__spreadValues({}, serializedRoot), {
     type: node.type,
     schemaVersion: 1,
     importedAt: (/* @__PURE__ */ new Date()).toISOString()
   });
 }
-function serializeNode({
+async function serializeNode({
   node,
   isRoot = false,
   rootBounds,
@@ -1019,6 +1080,15 @@ function serializeNode({
   const rootRelativeBounds = getRelativeBounds(absoluteBounds, rootBounds);
   const percentOfParent = parentBounds == null ? void 0 : getPercentBounds(parentRelativeBounds, parentBounds);
   const percentOfRoot = getPercentBounds(rootRelativeBounds, rootBounds);
+  const children = hasChildren(node) ? await Promise.all(node.children.map((child, index) => serializeNode({
+    node: child,
+    rootBounds,
+    parentBounds: absoluteBounds,
+    parentId: node.id,
+    depth: depth + 1,
+    siblingIndex: index,
+    siblingCount: node.children.length
+  }))) : [];
   return {
     id: node.id,
     name: node.name,
@@ -1045,17 +1115,9 @@ function serializeNode({
       }
     },
     layout: serializeLayout(node),
-    style: serializeStyle(node),
+    style: await serializeStyle(node),
     text: node.type === "TEXT" ? serializeText(node) : void 0,
-    children: hasChildren(node) ? node.children.map((child, index) => serializeNode({
-      node: child,
-      rootBounds,
-      parentBounds: absoluteBounds,
-      parentId: node.id,
-      depth: depth + 1,
-      siblingIndex: index,
-      siblingCount: node.children.length
-    })) : []
+    children
   };
 }
 function serializeLayout(node) {
@@ -1120,7 +1182,7 @@ function serializeResponsiveMetadata(node, isRoot) {
     acceptsChildren: hasChildren(node)
   };
 }
-function serializeStyle(node) {
+async function serializeStyle(node) {
   const style = {};
   if ("opacity" in node) {
     style.opacity = node.opacity;
@@ -1129,10 +1191,10 @@ function serializeStyle(node) {
     style.blendMode = node.blendMode;
   }
   if ("fills" in node && node.fills !== figma.mixed) {
-    style.fills = toJsonValue(node.fills);
+    style.fills = await serializePaintArray(node.fills);
   }
   if ("strokes" in node) {
-    style.strokes = toJsonValue(node.strokes);
+    style.strokes = await serializePaintArray(node.strokes);
   }
   if ("strokeWeight" in node && node.strokeWeight !== figma.mixed) {
     style.strokeWeight = node.strokeWeight;
@@ -1145,6 +1207,33 @@ function serializeStyle(node) {
   }
   return style;
 }
+async function serializePaintArray(paints) {
+  const serializedPaints = await Promise.all(paints.map((paint) => serializePaint(paint)));
+  return serializedPaints;
+}
+async function serializePaint(paint) {
+  const serializedPaint = toJsonValue(paint);
+  if (paint.type !== "IMAGE" || typeof paint.imageHash !== "string") {
+    return serializedPaint;
+  }
+  const record = asJsonObject(serializedPaint);
+  if (record == null) {
+    return serializedPaint;
+  }
+  try {
+    const image = figma.getImageByHash(paint.imageHash);
+    if (image == null) {
+      return serializedPaint;
+    }
+    const bytes = await image.getBytesAsync();
+    return __spreadProps(__spreadValues({}, record), {
+      [serializedImageBytesKey]: bytesToBase64(bytes),
+      [serializedImageMimeKey]: getImageMimeType(bytes)
+    });
+  } catch (_error) {
+    return serializedPaint;
+  }
+}
 function serializeText(node) {
   return {
     characters: node.characters,
@@ -1156,6 +1245,33 @@ function serializeText(node) {
     lineHeight: toJsonValue(node.lineHeight),
     letterSpacing: toJsonValue(node.letterSpacing)
   };
+}
+function hasSerializedImageFill(node) {
+  return Array.isArray(node.style.fills) && node.style.fills.some((paint) => {
+    const record = asJsonObject(paint);
+    return (record == null ? void 0 : record.type) === "IMAGE";
+  });
+}
+function fitSerializedImageFills(value) {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+  return value.map((paint) => {
+    const record = asJsonObject(paint);
+    if ((record == null ? void 0 : record.type) !== "IMAGE") {
+      return paint;
+    }
+    const _a = record, {
+      imageTransform: _imageTransform,
+      cropTransform: _cropTransform
+    } = _a, rest = __objRest(_a, [
+      "imageTransform",
+      "cropTransform"
+    ]);
+    return __spreadProps(__spreadValues({}, rest), {
+      scaleMode: "FIT"
+    });
+  });
 }
 function isImportableFrameNode(node) {
   return node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE";
@@ -1249,13 +1365,45 @@ function toJsonValue(value) {
   }
   return String(value);
 }
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunkSize = 32768;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+function getImageMimeType(bytes) {
+  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) {
+    return "image/jpeg";
+  }
+  if (bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71) {
+    return "image/png";
+  }
+  if (bytes[0] === 71 && bytes[1] === 73 && bytes[2] === 70) {
+    return "image/gif";
+  }
+  return "image/png";
+}
 function sendToUi(message) {
   figma.ui.postMessage(message);
 }
+var serializedImageBytesKey, serializedImageMimeKey;
 var init_main = __esm({
   "src/main.ts"() {
     "use strict";
     init_lib();
+    serializedImageBytesKey = "__responsiveImageBytes";
+    serializedImageMimeKey = "__responsiveImageMime";
   }
 });
 

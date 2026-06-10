@@ -616,6 +616,26 @@ export function getSolidFillColor(value: FigmaJsonValue | undefined): string | u
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`
 }
 
+export function getImageFillDataUrl(value: FigmaJsonValue | undefined): string | undefined {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  const paint = value.find((entry) => {
+    return isJsonObject(entry) && entry.type === "IMAGE" && entry.visible !== false
+  })
+
+  if (!isJsonObject(paint) || typeof paint.__responsiveImageBytes !== "string") {
+    return undefined
+  }
+
+  const mimeType = typeof paint.__responsiveImageMime === "string"
+    ? paint.__responsiveImageMime
+    : "image/png"
+
+  return `data:${mimeType};base64,${paint.__responsiveImageBytes}`
+}
+
 export function getCornerRadius(value: number | string | undefined, scale: number): string | undefined {
   return typeof value === "number" ? `${value * scale}px` : undefined
 }
@@ -683,6 +703,24 @@ export function getTextLineHeight(node: FigmaSerializedNode, scale: number): str
 
   if (lineHeight.unit === "PERCENT" && typeof lineHeight.value === "number") {
     return `${lineHeight.value}%`
+  }
+
+  return undefined
+}
+
+export function getTextLetterSpacing(node: FigmaSerializedNode, scale: number): string | undefined {
+  const letterSpacing = node.text?.letterSpacing
+
+  if (!isJsonObject(letterSpacing)) {
+    return undefined
+  }
+
+  if (letterSpacing.unit === "PIXELS" && typeof letterSpacing.value === "number") {
+    return `${letterSpacing.value * scale}px`
+  }
+
+  if (letterSpacing.unit === "PERCENT" && typeof letterSpacing.value === "number") {
+    return `${letterSpacing.value / 100}em`
   }
 
   return undefined

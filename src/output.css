@@ -564,6 +564,9 @@
   .w-14 {
     width: calc(var(--spacing) * 14) !important;
   }
+  .w-40 {
+    width: calc(var(--spacing) * 40) !important;
+  }
   .w-52 {
     width: calc(var(--spacing) * 52) !important;
   }
@@ -1376,6 +1379,9 @@
   .underline {
     text-decoration-line: underline !important;
   }
+  .accent-\[\#0f766e\] {
+    accent-color: #0f766e !important;
+  }
   .opacity-0 {
     opacity: 0% !important;
   }
@@ -1517,6 +1523,13 @@
     &:hover {
       @media (hover: hover) {
         background-color: #ebe6ff !important;
+      }
+    }
+  }
+  .hover\:bg-\[\#ecfdf5\] {
+    &:hover {
+      @media (hover: hover) {
+        background-color: #ecfdf5 !important;
       }
     }
   }

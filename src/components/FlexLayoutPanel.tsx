@@ -1,10 +1,12 @@
 import { h } from "preact"
 import type { ComponentChildren } from "preact"
+import { useEffect, useState } from "preact/hooks"
 import type { FigmaSerializedNode } from "../frameSchema"
 import { createEditorGeometry } from "./editorModel"
 
 type FlexLayoutPanelProps = {
   node: FigmaSerializedNode
+  parentNode: FigmaSerializedNode | null
   parentLayoutMode: Direction | null
   onChange: (node: FigmaSerializedNode) => void
 }
@@ -13,12 +15,16 @@ type Direction = "HORIZONTAL" | "VERTICAL"
 type AxisAlign = "MIN" | "CENTER" | "MAX" | "SPACE_BETWEEN"
 type CrossAlign = "MIN" | "CENTER" | "MAX" | "BASELINE"
 type SizingMode = "FILL" | "HUG" | "FIXED"
+type SizeEditMode = "relative" | "custom"
+const spacingMax = 10000
 
 export default function FlexLayoutPanel({
   node,
+  parentNode,
   parentLayoutMode,
   onChange
 }: FlexLayoutPanelProps) {
+  const [sizeEditMode, setSizeEditMode] = useState<SizeEditMode>(parentNode == null ? "custom" : "relative")
   const layout = node.layout
   const isContainer = node.children.length > 0 || isFrameLikeNode(node)
   const padding = layout.padding ?? {
@@ -36,6 +42,21 @@ export default function FlexLayoutPanel({
   const widthSizing = getCurrentWidthSizing()
   const heightSizing = getCurrentHeightSizing()
   const sizingOptions = getSizingOptions(parentLayoutMode != null)
+  const currentLayoutMode = layout.layoutMode === "HORIZONTAL" ? "HORIZONTAL" : "VERTICAL"
+  const mainAxisAlignLabel = currentLayoutMode === "HORIZONTAL" ? "Horizontal align" : "Vertical align"
+  const crossAxisAlignLabel = currentLayoutMode === "HORIZONTAL" ? "Vertical align" : "Horizontal align"
+  const parentWidth = parentNode == null ? 0 : Math.max(1, parentNode.geometry.width)
+  const parentHeight = parentNode == null ? 0 : Math.max(1, parentNode.geometry.height)
+  const canUseRelativeSize = parentNode != null && parentWidth > 0 && parentHeight > 0
+  const activeSizeEditMode = canUseRelativeSize ? sizeEditMode : "custom"
+  const widthPercent = getRelativePercent(node.geometry.width, parentWidth)
+  const heightPercent = getRelativePercent(node.geometry.height, parentHeight)
+
+  useEffect(() => {
+    if (!canUseRelativeSize) {
+      setSizeEditMode("custom")
+    }
+  }, [canUseRelativeSize])
 
   function updateLayout(
     nextLayout: Partial<FigmaSerializedNode["layout"]>,
@@ -51,6 +72,33 @@ export default function FlexLayoutPanel({
         ...nextLayout
       }
     })
+  }
+
+  function updateSpacingLayout(nextLayout: Partial<FigmaSerializedNode["layout"]>) {
+    if (!isContainer) {
+      updateLayout(nextLayout)
+      return
+    }
+
+    const mergedLayout = {
+      ...layout,
+      isAutoLayout: true,
+      ...nextLayout
+    }
+    const nextChildren = preserveChildrenSizeOnAxes(["horizontal", "vertical"])
+    const fitSize = getContainerFitSize(mergedLayout, nextChildren, node.geometry)
+    const nextWidth = Math.max(node.geometry.width, fitSize.width)
+    const nextHeight = Math.max(node.geometry.height, fitSize.height)
+
+    updateLayoutAndGeometry(
+      normalizeContainerSizingForGeometry(mergedLayout, node.geometry, {
+        width: nextWidth,
+        height: nextHeight
+      }),
+      nextWidth,
+      nextHeight,
+      nextChildren
+    )
   }
 
   function updateWidthSizing(sizingMode: SizingMode) {
@@ -96,8 +144,6 @@ export default function FlexLayoutPanel({
   }
 
   function updateDirection(layoutMode: Direction) {
-    const currentLayoutMode = layout.layoutMode === "HORIZONTAL" ? "HORIZONTAL" : "VERTICAL"
-
     if (currentLayoutMode === layoutMode) {
       return
     }
@@ -111,26 +157,75 @@ export default function FlexLayoutPanel({
     // whitespace). Reset oversized imported gaps when switching direction.
     const nextItemSpacing = Math.min(layout.itemSpacing ?? 0, 48)
 
+    const nextLayout = {
+      ...layout,
+      isAutoLayout: true,
+      autoLayoutDirection: layoutMode,
+      layoutMode,
+      itemSpacing: nextItemSpacing,
+      primaryAxisSizingMode: "FIXED" as const,
+      ...(layoutMode === "VERTICAL"
+        ? { layoutSizingVertical: "FIXED" as const }
+        : { layoutSizingHorizontal: "FIXED" as const })
+    }
+    const fitSize = getContainerFitSize(nextLayout, nextChildren, node.geometry)
+    const nextWidth = Math.max(node.geometry.width, fitSize.width)
+    const nextHeight = Math.max(node.geometry.height, fitSize.height)
+
+    updateLayoutAndGeometry(
+      normalizeContainerSizingForGeometry(nextLayout, node.geometry, {
+        width: nextWidth,
+        height: nextHeight
+      }),
+      nextWidth,
+      nextHeight,
+      nextChildren
+    )
+  }
+
+  function expandChildrenToFill(axis: "horizontal" | "vertical") {
+    const nextChildren = node.children.map((child) => {
+      const widthSizing = axis === "horizontal"
+        ? "FILL"
+        : getChildAxisSizingForParent(child, "horizontal", currentLayoutMode)
+      const heightSizing = axis === "vertical"
+        ? "FILL"
+        : getChildAxisSizingForParent(child, "vertical", currentLayoutMode)
+
+      return {
+        ...child,
+        layout: {
+          ...child.layout,
+          ...normalizeChildSizingForParent({
+            widthSizing,
+            heightSizing
+          }, {
+            parentLayoutMode: currentLayoutMode
+          }, {
+            layoutSizingHorizontal: widthSizing,
+            layoutSizingVertical: heightSizing
+          })
+        }
+      }
+    })
+
     onChange({
       ...node,
       children: nextChildren,
       layout: {
         ...layout,
         isAutoLayout: true,
-        autoLayoutDirection: layoutMode,
-        layoutMode,
-        itemSpacing: nextItemSpacing,
-        // Keep the container wrapped around its children on the new main axis.
-        primaryAxisSizingMode: "AUTO",
-        ...(layoutMode === "VERTICAL"
-          ? { layoutSizingVertical: "HUG" as const }
-          : { layoutSizingHorizontal: "HUG" as const })
+        layoutMode: currentLayoutMode,
+        autoLayoutDirection: currentLayoutMode
       }
     })
   }
 
   function updateWidthValue(width: number) {
     const nextWidth = clampDimension(width)
+    const nextChildren = isContainer
+      ? preserveChildrenSizeOnAxes(["horizontal"])
+      : node.children
 
     updateLayoutAndGeometry(
       normalizeChildSizingForParent({
@@ -148,12 +243,16 @@ export default function FlexLayoutPanel({
           : {})
       }),
       nextWidth,
-      node.geometry.height
+      node.geometry.height,
+      nextChildren
     )
   }
 
   function updateHeightValue(height: number) {
     const nextHeight = clampDimension(height)
+    const nextChildren = isContainer
+      ? preserveChildrenSizeOnAxes(["vertical"])
+      : node.children
 
     updateLayoutAndGeometry(
       normalizeChildSizingForParent({
@@ -171,17 +270,28 @@ export default function FlexLayoutPanel({
           : {})
       }),
       node.geometry.width,
-      nextHeight
+      nextHeight,
+      nextChildren
     )
+  }
+
+  function updateWidthPercent(percent: number) {
+    updateWidthValue(parentWidth * (percent / 100))
+  }
+
+  function updateHeightPercent(percent: number) {
+    updateHeightValue(parentHeight * (percent / 100))
   }
 
   function updateLayoutAndGeometry(
     nextLayout: Partial<FigmaSerializedNode["layout"]>,
     width: number,
-    height: number
+    height: number,
+    nextChildren = node.children
   ) {
     onChange({
       ...node,
+      children: nextChildren,
       geometry: createEditorGeometry(
         node.geometry.x,
         node.geometry.y,
@@ -193,6 +303,33 @@ export default function FlexLayoutPanel({
         ...layout,
         isAutoLayout: layout.isAutoLayout || isContainer,
         ...nextLayout
+      }
+    })
+  }
+
+  function preserveChildrenSizeOnAxes(axes: Array<"horizontal" | "vertical">): FigmaSerializedNode[] {
+    return node.children.map((child) => {
+      const widthSizing = axes.includes("horizontal")
+        ? "FIXED"
+        : getChildAxisSizingForParent(child, "horizontal", currentLayoutMode)
+      const heightSizing = axes.includes("vertical")
+        ? "FIXED"
+        : getChildAxisSizingForParent(child, "vertical", currentLayoutMode)
+
+      return {
+        ...child,
+        layout: {
+          ...child.layout,
+          ...normalizeChildSizingForParent({
+            widthSizing,
+            heightSizing
+          }, {
+            parentLayoutMode: currentLayoutMode
+          }, {
+            layoutSizingHorizontal: widthSizing,
+            layoutSizingVertical: heightSizing
+          })
+        }
       }
     })
   }
@@ -230,21 +367,43 @@ export default function FlexLayoutPanel({
         )}
 
         {isContainer && (
+          <ControlGroup label="Expand children">
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => expandChildrenToFill("horizontal")}
+                class="h-10 rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 text-xs font-semibold text-gray-700 transition hover:border-[#0f766e] hover:bg-[#ecfdf5] hover:text-[#0f766e]"
+              >
+                Fill width
+              </button>
+
+              <button
+                type="button"
+                onClick={() => expandChildrenToFill("vertical")}
+                class="h-10 rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 text-xs font-semibold text-gray-700 transition hover:border-[#0f766e] hover:bg-[#ecfdf5] hover:text-[#0f766e]"
+              >
+                Fill height
+              </button>
+            </div>
+          </ControlGroup>
+        )}
+
+        {isContainer && (
           <div class="grid grid-cols-2 gap-2">
             <NumberField
               label="Gap"
               value={layout.itemSpacing ?? 0}
               min={0}
-              max={240}
-              onChange={(itemSpacing) => updateLayout({ itemSpacing }, { forceAutoLayout: true })}
+              max={spacingMax}
+              onChange={(itemSpacing) => updateSpacingLayout({ itemSpacing })}
             />
 
             <NumberField
               label="Wrap gap"
               value={layout.counterAxisSpacing ?? 0}
               min={0}
-              max={240}
-              onChange={(counterAxisSpacing) => updateLayout({ counterAxisSpacing }, { forceAutoLayout: true })}
+              max={spacingMax}
+              onChange={(counterAxisSpacing) => updateSpacingLayout({ counterAxisSpacing })}
             />
           </div>
         )}
@@ -252,7 +411,7 @@ export default function FlexLayoutPanel({
         {isContainer && (
           <div class="grid grid-cols-2 gap-2">
             <SelectField<AxisAlign>
-              label="Justify items"
+              label={mainAxisAlignLabel}
               value={(layout.primaryAxisAlignItems as AxisAlign | undefined) ?? "MIN"}
               options={[
                 { value: "MIN", label: "Start" },
@@ -264,7 +423,7 @@ export default function FlexLayoutPanel({
             />
 
             <SelectField<CrossAlign>
-              label="Align items"
+              label={crossAxisAlignLabel}
               value={(layout.counterAxisAlignItems as CrossAlign | undefined) ?? "MIN"}
               options={[
                 { value: "MIN", label: "Start" },
@@ -293,22 +452,73 @@ export default function FlexLayoutPanel({
           />
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
-          <NumberField
-            label="W"
-            value={Math.round(node.geometry.width)}
-            min={1}
-            max={10000}
-            onChange={updateWidthValue}
-          />
+        <div>
+          <div class="mb-2 flex items-end justify-between gap-2">
+            <span class="text-[11px] font-semibold text-gray-600">
+              Size values
+            </span>
 
-          <NumberField
-            label="H"
-            value={Math.round(node.geometry.height)}
-            min={1}
-            max={10000}
-            onChange={updateHeightValue}
-          />
+            <div class="w-40">
+              <SegmentedControl<SizeEditMode>
+                value={activeSizeEditMode}
+                options={[
+                  { value: "relative", label: "%" },
+                  { value: "custom", label: "px" }
+                ]}
+                onChange={(nextMode) => {
+                  if (nextMode === "relative" && !canUseRelativeSize) {
+                    return
+                  }
+
+                  setSizeEditMode(nextMode)
+                }}
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            {activeSizeEditMode === "relative" ? (
+              [
+                <NumberField
+                  key="width-percent"
+                  label="Width %"
+                  value={widthPercent}
+                  min={1}
+                  max={1000}
+                  onChange={updateWidthPercent}
+                />,
+
+                <NumberField
+                  key="height-percent"
+                  label="Height %"
+                  value={heightPercent}
+                  min={1}
+                  max={1000}
+                  onChange={updateHeightPercent}
+                />
+              ]
+            ) : (
+              [
+                <NumberField
+                  key="custom-width"
+                  label="Custom W"
+                  value={Math.round(node.geometry.width)}
+                  min={1}
+                  max={10000}
+                  onChange={updateWidthValue}
+                />,
+
+                <NumberField
+                  key="custom-height"
+                  label="Custom H"
+                  value={Math.round(node.geometry.height)}
+                  min={1}
+                  max={10000}
+                  onChange={updateHeightValue}
+                />
+              ]
+            )}
+          </div>
         </div>
 
         {!isContainer && parentLayoutMode != null && (
@@ -342,7 +552,7 @@ export default function FlexLayoutPanel({
             margin={margin}
             padding={padding}
             onMarginChange={(nextMargin) => updateLayout({ margin: nextMargin }, { forceAutoLayout: true })}
-            onPaddingChange={(nextPadding) => updateLayout({ padding: nextPadding }, { forceAutoLayout: true })}
+            onPaddingChange={(nextPadding) => updateSpacingLayout({ padding: nextPadding })}
           />
         )}
       </div>
@@ -519,6 +729,99 @@ function getParentAxis(
 
 function clampDimension(value: number): number {
   return Math.min(10000, Math.max(1, Math.round(value)))
+}
+
+function getRelativePercent(value: number, reference: number): number {
+  if (!Number.isFinite(reference) || reference <= 0) {
+    return 100
+  }
+
+  return Math.min(1000, Math.max(1, Math.round((value / reference) * 100)))
+}
+
+function getContainerFitSize(
+  layout: FigmaSerializedNode["layout"],
+  children: FigmaSerializedNode[],
+  fallbackSize: Pick<FigmaSerializedNode["geometry"], "width" | "height">
+): {
+  width: number
+  height: number
+} {
+  if (children.length === 0) {
+    return fallbackSize
+  }
+
+  const layoutMode = layout.layoutMode === "HORIZONTAL" ? "HORIZONTAL" : "VERTICAL"
+  const padding = layout.padding ?? {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0
+  }
+  const gap = Math.max(0, layout.itemSpacing ?? 0)
+  const childSizes = children.map((child) => {
+    const margin = child.layout.margin ?? {
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0
+    }
+
+    return {
+      width: child.geometry.width + margin.left + margin.right,
+      height: child.geometry.height + margin.top + margin.bottom
+    }
+  })
+  const gapTotal = gap * Math.max(0, childSizes.length - 1)
+
+  if (layoutMode === "HORIZONTAL") {
+    return {
+      width: padding.left + padding.right + childSizes.reduce((total, child) => total + child.width, 0) + gapTotal,
+      height: padding.top + padding.bottom + Math.max(...childSizes.map((child) => child.height))
+    }
+  }
+
+  return {
+    width: padding.left + padding.right + Math.max(...childSizes.map((child) => child.width)),
+    height: padding.top + padding.bottom + childSizes.reduce((total, child) => total + child.height, 0) + gapTotal
+  }
+}
+
+function normalizeContainerSizingForGeometry(
+  layout: FigmaSerializedNode["layout"],
+  previousSize: Pick<FigmaSerializedNode["geometry"], "width" | "height">,
+  nextSize: {
+    width: number
+    height: number
+  }
+): Partial<FigmaSerializedNode["layout"]> {
+  const nextLayout = {
+    ...layout
+  }
+  const grewWidth = nextSize.width > previousSize.width
+  const grewHeight = nextSize.height > previousSize.height
+
+  if (grewWidth) {
+    nextLayout.layoutSizingHorizontal = "FIXED"
+
+    if (layout.layoutMode === "HORIZONTAL") {
+      nextLayout.primaryAxisSizingMode = "FIXED"
+    } else {
+      nextLayout.counterAxisSizingMode = "FIXED"
+    }
+  }
+
+  if (grewHeight) {
+    nextLayout.layoutSizingVertical = "FIXED"
+
+    if (layout.layoutMode === "VERTICAL") {
+      nextLayout.primaryAxisSizingMode = "FIXED"
+    } else {
+      nextLayout.counterAxisSizingMode = "FIXED"
+    }
+  }
+
+  return nextLayout
 }
 
 function toAxisSizingMode(sizingMode: SizingMode): "AUTO" | "FIXED" {
@@ -824,13 +1127,13 @@ function BoxModelInput({
         type="number"
         value={String(value)}
         min={0}
-        max={240}
+        max={spacingMax}
         aria-label={label}
         onInput={(event) => {
           const nextValue = Number(event.currentTarget.value)
 
           if (Number.isFinite(nextValue)) {
-            onChange(Math.min(240, Math.max(0, nextValue)))
+            onChange(Math.min(spacingMax, Math.max(0, nextValue)))
           }
         }}
         class="h-full min-h-8 w-full rounded border border-white/80 bg-white/90 px-1 text-center text-xs font-bold text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10"

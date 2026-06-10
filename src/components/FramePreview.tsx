@@ -4,10 +4,12 @@ import type { FigmaSerializedFrame, FigmaSerializedNode } from "../frameSchema"
 import {
   getChildrenBounds,
   getCornerRadius,
+  getImageFillDataUrl,
   getSolidFillColor,
   getTextFontFamily,
   getTextFontWeight,
   getTextHorizontalAlign,
+  getTextLetterSpacing,
   getTextLineHeight,
   getTextVerticalJustify,
   isVirtualGroup
@@ -167,8 +169,9 @@ function PreviewNode({
   }
 
   const fillColor = getSolidFillColor(node.style.fills)
+  const imageFill = getImageFillDataUrl(node.style.fills)
   const isTextNode = node.text != null
-  const backgroundColor = isTextNode ? undefined : fillColor
+  const backgroundColor = isTextNode || imageFill != null ? undefined : fillColor
   const textColor = isTextNode ? fillColor : undefined
   const borderColor = getSolidFillColor(node.style.strokes)
   const borderWidth = borderColor == null
@@ -191,6 +194,10 @@ function PreviewNode({
         height: `${node.geometry.height * scale}px`,
         opacity: node.style.opacity,
         backgroundColor,
+        backgroundImage: imageFill == null ? undefined : `url(${imageFill})`,
+        backgroundPosition: imageFill == null ? undefined : "center",
+        backgroundRepeat: imageFill == null ? undefined : "no-repeat",
+        backgroundSize: imageFill == null ? undefined : "contain",
         borderColor,
         borderStyle: borderColor == null ? undefined : "solid",
         borderWidth: `${borderWidth}px`,
@@ -213,6 +220,7 @@ function PreviewNode({
             fontFamily: getTextFontFamily(node),
             fontWeight: getTextFontWeight(node),
             lineHeight: getTextLineHeight(node, scale),
+            letterSpacing: getTextLetterSpacing(node, scale),
             color: textColor ?? "#1f2937",
             textAlign: getTextHorizontalAlign(node),
             whiteSpace: "pre-wrap",

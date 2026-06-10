@@ -2,6 +2,7 @@ declare const styles: {
   readonly "-space-x-2": string;
   readonly "[writing-mode:vertical-rl]": string;
   readonly "absolute": string;
+  readonly "accent-[#0f766e]": string;
   readonly "bg-[#0f766e]": string;
   readonly "bg-[#111827]": string;
   readonly "bg-[#5b35f5]": string;
@@ -171,6 +172,7 @@ declare const styles: {
   readonly "hover:bg-[#4c2ee0]": string;
   readonly "hover:bg-[#ccfbf1]": string;
   readonly "hover:bg-[#ebe6ff]": string;
+  readonly "hover:bg-[#ecfdf5]": string;
   readonly "hover:bg-[#f59e0b]": string;
   readonly "hover:bg-black": string;
   readonly "hover:bg-gray-100": string;
@@ -385,6 +387,7 @@ declare const styles: {
   readonly "w-14": string;
   readonly "w-2": string;
   readonly "w-4": string;
+  readonly "w-40": string;
   readonly "w-5": string;
   readonly "w-52": string;
   readonly "w-6": string;

@@ -427,9 +427,9 @@
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/c92ba5c6-e0b8-4064-9950-21e630a8bd31/base.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/4c12224d-4e16-4beb-9d57-6c7d84ef8ee5/base.js
   var init_base = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/c92ba5c6-e0b8-4064-9950-21e630a8bd31/base.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/4c12224d-4e16-4beb-9d57-6c7d84ef8ee5/base.js"() {
       if (document.getElementById("0a792085d1") === null) {
         const element = document.createElement("style");
         element.id = "0a792085d1";
@@ -578,9 +578,9 @@ svg {
     }
   });
 
-  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/09870b39-2e33-49b2-8fe8-36445973b5b0/output.js
+  // ../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/cb23759d-ac83-409a-9bd0-cae53266a70f/output.js
   var init_output = __esm({
-    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/09870b39-2e33-49b2-8fe8-36445973b5b0/output.js"() {
+    "../../../../../../private/var/folders/ky/rsp5401s0j5dhj7vxmrd2gdr0000gn/T/cb23759d-ac83-409a-9bd0-cae53266a70f/output.js"() {
       if (document.getElementById("db1a1ac058") === null) {
         const element = document.createElement("style");
         element.id = "db1a1ac058";
@@ -1149,6 +1149,9 @@ svg {
   }
   .w-14 {
     width: calc(var(--spacing) * 14) !important;
+  }
+  .w-40 {
+    width: calc(var(--spacing) * 40) !important;
   }
   .w-52 {
     width: calc(var(--spacing) * 52) !important;
@@ -1962,6 +1965,9 @@ svg {
   .underline {
     text-decoration-line: underline !important;
   }
+  .accent-\\[\\#0f766e\\] {
+    accent-color: #0f766e !important;
+  }
   .opacity-0 {
     opacity: 0% !important;
   }
@@ -2103,6 +2109,13 @@ svg {
     &:hover {
       @media (hover: hover) {
         background-color: #ebe6ff !important;
+      }
+    }
+  }
+  .hover\\:bg-\\[\\#ecfdf5\\] {
+    &:hover {
+      @media (hover: hover) {
+        background-color: #ecfdf5 !important;
       }
     }
   }
@@ -2781,13 +2794,13 @@ svg {
       }
     ];
   }
-  function getTargetDeviceWidth(targetDevice, sourceWidth) {
+  function getTargetDeviceWidth(targetDevice, sourceWidth, customScale = 1) {
     const safeSourceWidth = Math.max(1, Math.round(sourceWidth));
     if (targetDevice === "mobile") {
       return Math.max(1, Math.round(safeSourceWidth * mobileWidthScale));
     }
     if (targetDevice === "custom") {
-      return safeSourceWidth;
+      return Math.max(1, Math.round(safeSourceWidth * customScale));
     }
     if (targetDevice === "desktop") {
       return Math.max(1, Math.round(safeSourceWidth * desktopWidthScale));
@@ -2801,8 +2814,10 @@ svg {
     jsonImportError,
     isJsonImportedFrame,
     targetDevice,
+    customScale,
     layoutRules,
     onTargetDeviceChange,
+    onCustomScaleChange,
     onLayoutRulesChange,
     onClearFrame,
     onImportJson,
@@ -2837,11 +2852,12 @@ svg {
         return;
       }
       const importedWidth = Math.max(1, Math.round((_a = importedFrame == null ? void 0 : importedFrame.geometry.width) != null ? _a : frameForGeneration.geometry.width));
-      const targetWidth = getTargetDeviceWidth(targetDevice, importedWidth);
+      const targetWidth = getTargetDeviceWidth(targetDevice, importedWidth, customScale);
       const payload = {
         targetDevice,
         sourceWidth: importedWidth,
         screenWidth: targetWidth,
+        customScale: targetDevice === "custom" ? customScale : void 0,
         sourceFrame: isJsonImportedFrame ? null : frameForGeneration,
         layoutRules,
         options
@@ -2886,6 +2902,13 @@ svg {
       {
         value: targetDevice,
         onChange: onTargetDeviceChange
+      }
+    ), targetDevice === "custom" && /* @__PURE__ */ k(
+      CustomScaleControl,
+      {
+        sourceWidth: getImportedFrameWidth(workingFrame != null ? workingFrame : importedFrame),
+        scale: customScale,
+        onChange: onCustomScaleChange
       }
     ), /* @__PURE__ */ k(StepTitle, { index: 3, title: "Layout Rules", className: "mt-7" }), /* @__PURE__ */ k(
       LayoutRules,
@@ -2993,6 +3016,30 @@ svg {
         /* @__PURE__ */ k("span", { class: "min-w-0 truncate" }, device.label)
       );
     }));
+  }
+  function CustomScaleControl({
+    sourceWidth,
+    scale,
+    onChange
+  }) {
+    const scalePercent = Math.round(scale * 100);
+    const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+    return /* @__PURE__ */ k("div", { class: "mt-3 rounded-2xl border border-[#e5e7eb] bg-white p-4 shadow-sm" }, /* @__PURE__ */ k("div", { class: "mb-3 flex items-center justify-between gap-3" }, /* @__PURE__ */ k("div", null, /* @__PURE__ */ k("p", { class: "text-xs font-bold text-gray-900" }, "Custom scale"), /* @__PURE__ */ k("p", { class: "mt-0.5 text-[11px] text-gray-500" }, targetWidth, "px target width")), /* @__PURE__ */ k("span", { class: "rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-2 py-1 text-xs font-bold text-gray-700" }, scalePercent, "%")), /* @__PURE__ */ k(
+      "input",
+      {
+        type: "range",
+        min: 25,
+        max: 200,
+        step: 5,
+        value: String(scalePercent),
+        onInput: (event) => onChange(Number(event.currentTarget.value) / 100),
+        class: "h-2 w-full cursor-pointer accent-[#0f766e]"
+      }
+    ), /* @__PURE__ */ k("div", { class: "mt-2 flex justify-between text-[10px] font-semibold text-gray-400" }, /* @__PURE__ */ k("span", null, "25%"), /* @__PURE__ */ k("span", null, "100%"), /* @__PURE__ */ k("span", null, "200%")));
+  }
+  function getImportedFrameWidth(frame) {
+    var _a;
+    return Math.max(1, Math.round((_a = frame == null ? void 0 : frame.geometry.width) != null ? _a : 1));
   }
   var targetDeviceWidths, mobileWidthScale, desktopWidthScale;
   var init_ResponsiveSidebar = __esm({
@@ -3452,6 +3499,19 @@ svg {
     const blue = toCssColorChannel(paint.color.b);
     return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
   }
+  function getImageFillDataUrl(value) {
+    if (!Array.isArray(value)) {
+      return void 0;
+    }
+    const paint = value.find((entry) => {
+      return isJsonObject(entry) && entry.type === "IMAGE" && entry.visible !== false;
+    });
+    if (!isJsonObject(paint) || typeof paint.__responsiveImageBytes !== "string") {
+      return void 0;
+    }
+    const mimeType = typeof paint.__responsiveImageMime === "string" ? paint.__responsiveImageMime : "image/png";
+    return `data:${mimeType};base64,${paint.__responsiveImageBytes}`;
+  }
   function getCornerRadius(value, scale) {
     return typeof value === "number" ? `${value * scale}px` : void 0;
   }
@@ -3504,6 +3564,20 @@ svg {
     }
     if (lineHeight.unit === "PERCENT" && typeof lineHeight.value === "number") {
       return `${lineHeight.value}%`;
+    }
+    return void 0;
+  }
+  function getTextLetterSpacing(node, scale) {
+    var _a;
+    const letterSpacing = (_a = node.text) == null ? void 0 : _a.letterSpacing;
+    if (!isJsonObject(letterSpacing)) {
+      return void 0;
+    }
+    if (letterSpacing.unit === "PIXELS" && typeof letterSpacing.value === "number") {
+      return `${letterSpacing.value * scale}px`;
+    }
+    if (letterSpacing.unit === "PERCENT" && typeof letterSpacing.value === "number") {
+      return `${letterSpacing.value / 100}em`;
     }
     return void 0;
   }
@@ -3633,7 +3707,7 @@ svg {
       availableWidth / Math.max(reviewWidth, 1),
       availableHeight / Math.max(reviewHeight, 1)
     );
-    const canvasScale = Math.min(1, Math.max(0.1, fitScale));
+    const canvasScale = Math.min(1, Math.max(0.02, fitScale));
     const canvasWidth = Math.max(1, reviewWidth * canvasScale);
     const canvasHeight = Math.max(1, reviewHeight * canvasScale);
     const isFrameSelected = selectedNodeId === frame.id;
@@ -3692,7 +3766,7 @@ svg {
           class: "rounded-md border border-[#0f766e]/30 bg-[#ecfdf5] px-2 py-1 text-[10px] font-bold text-[#0f766e] transition hover:bg-[#ccfbf1]"
         },
         "Inspect"
-      ), /* @__PURE__ */ k("span", { class: "rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[10px] font-bold text-gray-500" }, Math.round(canvasScale * 100), "%"))), /* @__PURE__ */ k("div", { class: "flex justify-center" }, /* @__PURE__ */ k(
+      ), /* @__PURE__ */ k("span", { class: "rounded-md border border-[#e5e7eb] bg-white px-2 py-1 text-[10px] font-bold text-gray-500" }, formatZoomPercent(canvasScale)))), /* @__PURE__ */ k("div", { class: "flex justify-center" }, /* @__PURE__ */ k(
         "div",
         {
           class: "relative cursor-pointer overflow-hidden rounded border border-[#d1d5db] shadow-sm",
@@ -3732,6 +3806,8 @@ svg {
               node: group.node,
               origin: group.sourceBounds,
               scale: group.scale * canvasScale,
+              responsiveScale: group.scale,
+              canvasScale,
               layoutRules,
               reviewWidth,
               selectedNodeId,
@@ -3747,6 +3823,8 @@ svg {
     node,
     origin,
     scale,
+    responsiveScale,
+    canvasScale,
     layoutRules,
     reviewWidth,
     selectedNodeId,
@@ -3793,6 +3871,8 @@ svg {
             node: child.node,
             origin: { x: 0, y: 0 },
             scale,
+            responsiveScale,
+            canvasScale,
             layoutRules,
             reviewWidth,
             selectedNodeId,
@@ -3803,8 +3883,9 @@ svg {
       );
     }
     const fillColor = getSolidFillColor(renderNode.style.fills);
+    const imageFill = getImageFillDataUrl(renderNode.style.fills);
     const isTextNode = renderNode.text != null;
-    const backgroundColor = isTextNode ? void 0 : fillColor;
+    const backgroundColor = isTextNode || imageFill != null ? void 0 : fillColor;
     const textColor = isTextNode ? fillColor : void 0;
     const borderColor = getSolidFillColor(renderNode.style.strokes);
     const borderWidth = borderColor == null ? 0 : Math.max(1, ((_b = renderNode.style.strokeWeight) != null ? _b : 1) * scale);
@@ -3831,6 +3912,10 @@ svg {
           height: `${renderedHeight * scale}px`,
           opacity: renderNode.style.opacity,
           backgroundColor,
+          backgroundImage: imageFill == null ? void 0 : `url(${imageFill})`,
+          backgroundPosition: imageFill == null ? void 0 : "center",
+          backgroundRepeat: imageFill == null ? void 0 : "no-repeat",
+          backgroundSize: imageFill == null ? void 0 : "contain",
           borderColor,
           borderStyle: borderColor == null ? void 0 : "solid",
           borderWidth: `${borderWidth}px`,
@@ -3849,10 +3934,11 @@ svg {
             flexDirection: "column",
             alignItems: "stretch",
             justifyContent: getTextVerticalJustify(renderNode),
-            fontSize: typeof renderNode.text.fontSize === "number" ? `${getResponsiveFontSize(renderNode.text.fontSize, scale, layoutRules)}px` : void 0,
+            fontSize: typeof renderNode.text.fontSize === "number" ? `${getResponsiveFontSize(renderNode.text.fontSize, responsiveScale, layoutRules) * canvasScale}px` : void 0,
             fontFamily: getTextFontFamily(renderNode),
             fontWeight: getTextFontWeight(renderNode),
             lineHeight: layoutRules.tightenLineHeight ? 1.15 : getTextLineHeight(renderNode, scale),
+            letterSpacing: getTextLetterSpacing(renderNode, scale),
             color: textColor != null ? textColor : "#1f2937",
             textAlign: getTextHorizontalAlign(renderNode),
             whiteSpace: "pre-wrap",
@@ -3868,6 +3954,8 @@ svg {
           node: child.node,
           origin: { x: 0, y: 0 },
           scale,
+          responsiveScale,
+          canvasScale,
           layoutRules,
           reviewWidth,
           selectedNodeId,
@@ -4127,13 +4215,15 @@ svg {
     let nextY = outerPadding;
     return visibleChildren.map((child) => {
       const sourceBounds = child.geometry;
-      const scale = contentWidth / Math.max(sourceBounds.width, 1);
+      const fitScale = contentWidth / Math.max(sourceBounds.width, 1);
+      const scale = getImageFillDataUrl(child.style.fills) == null ? fitScale : Math.min(1, fitScale);
+      const width = getImageFillDataUrl(child.style.fills) == null ? contentWidth : Math.max(1, sourceBounds.width * scale);
       const height = Math.max(1, getResponsiveNodeHeight(child, layoutRules, reviewWidth) * scale);
       const group = {
         node: child,
-        x: outerPadding,
+        x: outerPadding + Math.max(0, (contentWidth - width) / 2),
         y: nextY,
-        width: contentWidth,
+        width,
         height,
         sourceBounds,
         scale
@@ -4449,6 +4539,10 @@ svg {
     }
     return "Custom";
   }
+  function formatZoomPercent(scale) {
+    const percent = scale * 100;
+    return percent < 10 ? `${Math.round(percent * 10) / 10}%` : `${Math.round(percent)}%`;
+  }
   var init_ExportPreviewDrawer = __esm({
     "src/components/ExportPreviewDrawer.tsx"() {
       "use strict";
@@ -4590,8 +4684,9 @@ svg {
       );
     }
     const fillColor = getSolidFillColor(node.style.fills);
+    const imageFill = getImageFillDataUrl(node.style.fills);
     const isTextNode = node.text != null;
-    const backgroundColor = isTextNode ? void 0 : fillColor;
+    const backgroundColor = isTextNode || imageFill != null ? void 0 : fillColor;
     const textColor = isTextNode ? fillColor : void 0;
     const borderColor = getSolidFillColor(node.style.strokes);
     const borderWidth = borderColor == null ? 0 : Math.max(1, ((_c = node.style.strokeWeight) != null ? _c : 1) * scale);
@@ -4612,6 +4707,10 @@ svg {
           height: `${node.geometry.height * scale}px`,
           opacity: node.style.opacity,
           backgroundColor,
+          backgroundImage: imageFill == null ? void 0 : `url(${imageFill})`,
+          backgroundPosition: imageFill == null ? void 0 : "center",
+          backgroundRepeat: imageFill == null ? void 0 : "no-repeat",
+          backgroundSize: imageFill == null ? void 0 : "contain",
           borderColor,
           borderStyle: borderColor == null ? void 0 : "solid",
           borderWidth: `${borderWidth}px`,
@@ -4633,6 +4732,7 @@ svg {
             fontFamily: getTextFontFamily(node),
             fontWeight: getTextFontWeight(node),
             lineHeight: getTextLineHeight(node, scale),
+            letterSpacing: getTextLetterSpacing(node, scale),
             color: textColor != null ? textColor : "#1f2937",
             textAlign: getTextHorizontalAlign(node),
             whiteSpace: "pre-wrap",
@@ -4665,10 +4765,12 @@ svg {
   // src/components/FlexLayoutPanel.tsx
   function FlexLayoutPanel({
     node,
+    parentNode,
     parentLayoutMode,
     onChange
   }) {
     var _a, _b, _c, _d, _e, _f;
+    const [sizeEditMode, setSizeEditMode] = d2(parentNode == null ? "custom" : "relative");
     const layout = node.layout;
     const isContainer = node.children.length > 0 || isFrameLikeNode(node);
     const padding = (_a = layout.padding) != null ? _a : {
@@ -4686,12 +4788,48 @@ svg {
     const widthSizing = getCurrentWidthSizing();
     const heightSizing = getCurrentHeightSizing();
     const sizingOptions = getSizingOptions(parentLayoutMode != null);
+    const currentLayoutMode = layout.layoutMode === "HORIZONTAL" ? "HORIZONTAL" : "VERTICAL";
+    const mainAxisAlignLabel = currentLayoutMode === "HORIZONTAL" ? "Horizontal align" : "Vertical align";
+    const crossAxisAlignLabel = currentLayoutMode === "HORIZONTAL" ? "Vertical align" : "Horizontal align";
+    const parentWidth = parentNode == null ? 0 : Math.max(1, parentNode.geometry.width);
+    const parentHeight = parentNode == null ? 0 : Math.max(1, parentNode.geometry.height);
+    const canUseRelativeSize = parentNode != null && parentWidth > 0 && parentHeight > 0;
+    const activeSizeEditMode = canUseRelativeSize ? sizeEditMode : "custom";
+    const widthPercent = getRelativePercent(node.geometry.width, parentWidth);
+    const heightPercent = getRelativePercent(node.geometry.height, parentHeight);
+    y2(() => {
+      if (!canUseRelativeSize) {
+        setSizeEditMode("custom");
+      }
+    }, [canUseRelativeSize]);
     function updateLayout(nextLayout, options = {}) {
       onChange(__spreadProps(__spreadValues({}, node), {
         layout: __spreadValues(__spreadProps(__spreadValues({}, layout), {
           isAutoLayout: options.forceAutoLayout === true || layout.isAutoLayout || isContainer
         }), nextLayout)
       }));
+    }
+    function updateSpacingLayout(nextLayout) {
+      if (!isContainer) {
+        updateLayout(nextLayout);
+        return;
+      }
+      const mergedLayout = __spreadValues(__spreadProps(__spreadValues({}, layout), {
+        isAutoLayout: true
+      }), nextLayout);
+      const nextChildren = preserveChildrenSizeOnAxes(["horizontal", "vertical"]);
+      const fitSize = getContainerFitSize(mergedLayout, nextChildren, node.geometry);
+      const nextWidth = Math.max(node.geometry.width, fitSize.width);
+      const nextHeight = Math.max(node.geometry.height, fitSize.height);
+      updateLayoutAndGeometry(
+        normalizeContainerSizingForGeometry(mergedLayout, node.geometry, {
+          width: nextWidth,
+          height: nextHeight
+        }),
+        nextWidth,
+        nextHeight,
+        nextChildren
+      );
     }
     function updateWidthSizing(sizingMode) {
       const safeSizingMode = normalizeSelectableSizingMode(sizingMode, parentLayoutMode);
@@ -4720,7 +4858,6 @@ svg {
     }
     function updateDirection(layoutMode) {
       var _a2;
-      const currentLayoutMode = layout.layoutMode === "HORIZONTAL" ? "HORIZONTAL" : "VERTICAL";
       if (currentLayoutMode === layoutMode) {
         return;
       }
@@ -4728,20 +4865,54 @@ svg {
         (child) => normalizeChildForParentDirection(child, currentLayoutMode, layoutMode)
       );
       const nextItemSpacing = Math.min((_a2 = layout.itemSpacing) != null ? _a2 : 0, 48);
+      const nextLayout = __spreadValues(__spreadProps(__spreadValues({}, layout), {
+        isAutoLayout: true,
+        autoLayoutDirection: layoutMode,
+        layoutMode,
+        itemSpacing: nextItemSpacing,
+        primaryAxisSizingMode: "FIXED"
+      }), layoutMode === "VERTICAL" ? { layoutSizingVertical: "FIXED" } : { layoutSizingHorizontal: "FIXED" });
+      const fitSize = getContainerFitSize(nextLayout, nextChildren, node.geometry);
+      const nextWidth = Math.max(node.geometry.width, fitSize.width);
+      const nextHeight = Math.max(node.geometry.height, fitSize.height);
+      updateLayoutAndGeometry(
+        normalizeContainerSizingForGeometry(nextLayout, node.geometry, {
+          width: nextWidth,
+          height: nextHeight
+        }),
+        nextWidth,
+        nextHeight,
+        nextChildren
+      );
+    }
+    function expandChildrenToFill(axis) {
+      const nextChildren = node.children.map((child) => {
+        const widthSizing2 = axis === "horizontal" ? "FILL" : getChildAxisSizingForParent(child, "horizontal", currentLayoutMode);
+        const heightSizing2 = axis === "vertical" ? "FILL" : getChildAxisSizingForParent(child, "vertical", currentLayoutMode);
+        return __spreadProps(__spreadValues({}, child), {
+          layout: __spreadValues(__spreadValues({}, child.layout), normalizeChildSizingForParent({
+            widthSizing: widthSizing2,
+            heightSizing: heightSizing2
+          }, {
+            parentLayoutMode: currentLayoutMode
+          }, {
+            layoutSizingHorizontal: widthSizing2,
+            layoutSizingVertical: heightSizing2
+          }))
+        });
+      });
       onChange(__spreadProps(__spreadValues({}, node), {
         children: nextChildren,
-        layout: __spreadValues(__spreadProps(__spreadValues({}, layout), {
+        layout: __spreadProps(__spreadValues({}, layout), {
           isAutoLayout: true,
-          autoLayoutDirection: layoutMode,
-          layoutMode,
-          itemSpacing: nextItemSpacing,
-          // Keep the container wrapped around its children on the new main axis.
-          primaryAxisSizingMode: "AUTO"
-        }), layoutMode === "VERTICAL" ? { layoutSizingVertical: "HUG" } : { layoutSizingHorizontal: "HUG" })
+          layoutMode: currentLayoutMode,
+          autoLayoutDirection: currentLayoutMode
+        })
       }));
     }
     function updateWidthValue(width) {
       const nextWidth = clampDimension(width);
+      const nextChildren = isContainer ? preserveChildrenSizeOnAxes(["horizontal"]) : node.children;
       updateLayoutAndGeometry(
         normalizeChildSizingForParent({
           widthSizing: "FIXED",
@@ -4752,11 +4923,13 @@ svg {
           layoutSizingHorizontal: "FIXED"
         }, isContainer && layout.layoutMode === "HORIZONTAL" ? { primaryAxisSizingMode: "FIXED" } : {}), isContainer && layout.layoutMode !== "HORIZONTAL" ? { counterAxisSizingMode: "FIXED" } : {})),
         nextWidth,
-        node.geometry.height
+        node.geometry.height,
+        nextChildren
       );
     }
     function updateHeightValue(height) {
       const nextHeight = clampDimension(height);
+      const nextChildren = isContainer ? preserveChildrenSizeOnAxes(["vertical"]) : node.children;
       updateLayoutAndGeometry(
         normalizeChildSizingForParent({
           widthSizing,
@@ -4767,11 +4940,19 @@ svg {
           layoutSizingVertical: "FIXED"
         }, isContainer && layout.layoutMode === "VERTICAL" ? { primaryAxisSizingMode: "FIXED" } : {}), isContainer && layout.layoutMode !== "VERTICAL" ? { counterAxisSizingMode: "FIXED" } : {})),
         node.geometry.width,
-        nextHeight
+        nextHeight,
+        nextChildren
       );
     }
-    function updateLayoutAndGeometry(nextLayout, width, height) {
+    function updateWidthPercent(percent) {
+      updateWidthValue(parentWidth * (percent / 100));
+    }
+    function updateHeightPercent(percent) {
+      updateHeightValue(parentHeight * (percent / 100));
+    }
+    function updateLayoutAndGeometry(nextLayout, width, height, nextChildren = node.children) {
       onChange(__spreadProps(__spreadValues({}, node), {
+        children: nextChildren,
         geometry: createEditorGeometry(
           node.geometry.x,
           node.geometry.y,
@@ -4783,6 +4964,23 @@ svg {
           isAutoLayout: layout.isAutoLayout || isContainer
         }), nextLayout)
       }));
+    }
+    function preserveChildrenSizeOnAxes(axes) {
+      return node.children.map((child) => {
+        const widthSizing2 = axes.includes("horizontal") ? "FIXED" : getChildAxisSizingForParent(child, "horizontal", currentLayoutMode);
+        const heightSizing2 = axes.includes("vertical") ? "FIXED" : getChildAxisSizingForParent(child, "vertical", currentLayoutMode);
+        return __spreadProps(__spreadValues({}, child), {
+          layout: __spreadValues(__spreadValues({}, child.layout), normalizeChildSizingForParent({
+            widthSizing: widthSizing2,
+            heightSizing: heightSizing2
+          }, {
+            parentLayoutMode: currentLayoutMode
+          }, {
+            layoutSizingHorizontal: widthSizing2,
+            layoutSizingVertical: heightSizing2
+          }))
+        });
+      });
     }
     function getCurrentWidthSizing() {
       return getSizingMode(
@@ -4808,14 +5006,30 @@ svg {
         ],
         onChange: updateDirection
       }
-    )), isContainer && /* @__PURE__ */ k("div", { class: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ k(
+    )), isContainer && /* @__PURE__ */ k(ControlGroup2, { label: "Expand children" }, /* @__PURE__ */ k("div", { class: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ k(
+      "button",
+      {
+        type: "button",
+        onClick: () => expandChildrenToFill("horizontal"),
+        class: "h-10 rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 text-xs font-semibold text-gray-700 transition hover:border-[#0f766e] hover:bg-[#ecfdf5] hover:text-[#0f766e]"
+      },
+      "Fill width"
+    ), /* @__PURE__ */ k(
+      "button",
+      {
+        type: "button",
+        onClick: () => expandChildrenToFill("vertical"),
+        class: "h-10 rounded-xl border border-[#cbd5e1] bg-[#f8fafc] px-3 text-xs font-semibold text-gray-700 transition hover:border-[#0f766e] hover:bg-[#ecfdf5] hover:text-[#0f766e]"
+      },
+      "Fill height"
+    ))), isContainer && /* @__PURE__ */ k("div", { class: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ k(
       NumberField2,
       {
         label: "Gap",
         value: (_c = layout.itemSpacing) != null ? _c : 0,
         min: 0,
-        max: 240,
-        onChange: (itemSpacing) => updateLayout({ itemSpacing }, { forceAutoLayout: true })
+        max: spacingMax,
+        onChange: (itemSpacing) => updateSpacingLayout({ itemSpacing })
       }
     ), /* @__PURE__ */ k(
       NumberField2,
@@ -4823,13 +5037,13 @@ svg {
         label: "Wrap gap",
         value: (_d = layout.counterAxisSpacing) != null ? _d : 0,
         min: 0,
-        max: 240,
-        onChange: (counterAxisSpacing) => updateLayout({ counterAxisSpacing }, { forceAutoLayout: true })
+        max: spacingMax,
+        onChange: (counterAxisSpacing) => updateSpacingLayout({ counterAxisSpacing })
       }
     )), isContainer && /* @__PURE__ */ k("div", { class: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ k(
       SelectField,
       {
-        label: "Justify items",
+        label: mainAxisAlignLabel,
         value: (_e = layout.primaryAxisAlignItems) != null ? _e : "MIN",
         options: [
           { value: "MIN", label: "Start" },
@@ -4842,7 +5056,7 @@ svg {
     ), /* @__PURE__ */ k(
       SelectField,
       {
-        label: "Align items",
+        label: crossAxisAlignLabel,
         value: (_f = layout.counterAxisAlignItems) != null ? _f : "MIN",
         options: [
           { value: "MIN", label: "Start" },
@@ -4868,25 +5082,68 @@ svg {
         options: sizingOptions,
         onChange: updateHeightSizing
       }
-    )), /* @__PURE__ */ k("div", { class: "grid grid-cols-2 gap-2" }, /* @__PURE__ */ k(
-      NumberField2,
+    )), /* @__PURE__ */ k("div", null, /* @__PURE__ */ k("div", { class: "mb-2 flex items-end justify-between gap-2" }, /* @__PURE__ */ k("span", { class: "text-[11px] font-semibold text-gray-600" }, "Size values"), /* @__PURE__ */ k("div", { class: "w-40" }, /* @__PURE__ */ k(
+      SegmentedControl2,
       {
-        label: "W",
-        value: Math.round(node.geometry.width),
-        min: 1,
-        max: 1e4,
-        onChange: updateWidthValue
+        value: activeSizeEditMode,
+        options: [
+          { value: "relative", label: "%" },
+          { value: "custom", label: "px" }
+        ],
+        onChange: (nextMode) => {
+          if (nextMode === "relative" && !canUseRelativeSize) {
+            return;
+          }
+          setSizeEditMode(nextMode);
+        }
       }
-    ), /* @__PURE__ */ k(
-      NumberField2,
-      {
-        label: "H",
-        value: Math.round(node.geometry.height),
-        min: 1,
-        max: 1e4,
-        onChange: updateHeightValue
-      }
-    )), !isContainer && parentLayoutMode != null && /* @__PURE__ */ k(
+    ))), /* @__PURE__ */ k("div", { class: "grid grid-cols-2 gap-2" }, activeSizeEditMode === "relative" ? [
+      /* @__PURE__ */ k(
+        NumberField2,
+        {
+          key: "width-percent",
+          label: "Width %",
+          value: widthPercent,
+          min: 1,
+          max: 1e3,
+          onChange: updateWidthPercent
+        }
+      ),
+      /* @__PURE__ */ k(
+        NumberField2,
+        {
+          key: "height-percent",
+          label: "Height %",
+          value: heightPercent,
+          min: 1,
+          max: 1e3,
+          onChange: updateHeightPercent
+        }
+      )
+    ] : [
+      /* @__PURE__ */ k(
+        NumberField2,
+        {
+          key: "custom-width",
+          label: "Custom W",
+          value: Math.round(node.geometry.width),
+          min: 1,
+          max: 1e4,
+          onChange: updateWidthValue
+        }
+      ),
+      /* @__PURE__ */ k(
+        NumberField2,
+        {
+          key: "custom-height",
+          label: "Custom H",
+          value: Math.round(node.geometry.height),
+          min: 1,
+          max: 1e4,
+          onChange: updateHeightValue
+        }
+      )
+    ])), !isContainer && parentLayoutMode != null && /* @__PURE__ */ k(
       "button",
       {
         type: "button",
@@ -4910,7 +5167,7 @@ svg {
         margin,
         padding,
         onMarginChange: (nextMargin) => updateLayout({ margin: nextMargin }, { forceAutoLayout: true }),
-        onPaddingChange: (nextPadding) => updateLayout({ padding: nextPadding }, { forceAutoLayout: true })
+        onPaddingChange: (nextPadding) => updateSpacingLayout({ padding: nextPadding })
       }
     )));
   }
@@ -5005,6 +5262,72 @@ svg {
   }
   function clampDimension(value) {
     return Math.min(1e4, Math.max(1, Math.round(value)));
+  }
+  function getRelativePercent(value, reference) {
+    if (!Number.isFinite(reference) || reference <= 0) {
+      return 100;
+    }
+    return Math.min(1e3, Math.max(1, Math.round(value / reference * 100)));
+  }
+  function getContainerFitSize(layout, children, fallbackSize) {
+    var _a, _b;
+    if (children.length === 0) {
+      return fallbackSize;
+    }
+    const layoutMode = layout.layoutMode === "HORIZONTAL" ? "HORIZONTAL" : "VERTICAL";
+    const padding = (_a = layout.padding) != null ? _a : {
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0
+    };
+    const gap = Math.max(0, (_b = layout.itemSpacing) != null ? _b : 0);
+    const childSizes = children.map((child) => {
+      var _a2;
+      const margin = (_a2 = child.layout.margin) != null ? _a2 : {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0
+      };
+      return {
+        width: child.geometry.width + margin.left + margin.right,
+        height: child.geometry.height + margin.top + margin.bottom
+      };
+    });
+    const gapTotal = gap * Math.max(0, childSizes.length - 1);
+    if (layoutMode === "HORIZONTAL") {
+      return {
+        width: padding.left + padding.right + childSizes.reduce((total, child) => total + child.width, 0) + gapTotal,
+        height: padding.top + padding.bottom + Math.max(...childSizes.map((child) => child.height))
+      };
+    }
+    return {
+      width: padding.left + padding.right + Math.max(...childSizes.map((child) => child.width)),
+      height: padding.top + padding.bottom + childSizes.reduce((total, child) => total + child.height, 0) + gapTotal
+    };
+  }
+  function normalizeContainerSizingForGeometry(layout, previousSize, nextSize) {
+    const nextLayout = __spreadValues({}, layout);
+    const grewWidth = nextSize.width > previousSize.width;
+    const grewHeight = nextSize.height > previousSize.height;
+    if (grewWidth) {
+      nextLayout.layoutSizingHorizontal = "FIXED";
+      if (layout.layoutMode === "HORIZONTAL") {
+        nextLayout.primaryAxisSizingMode = "FIXED";
+      } else {
+        nextLayout.counterAxisSizingMode = "FIXED";
+      }
+    }
+    if (grewHeight) {
+      nextLayout.layoutSizingVertical = "FIXED";
+      if (layout.layoutMode === "VERTICAL") {
+        nextLayout.primaryAxisSizingMode = "FIXED";
+      } else {
+        nextLayout.counterAxisSizingMode = "FIXED";
+      }
+    }
+    return nextLayout;
   }
   function toAxisSizingMode(sizingMode) {
     return sizingMode === "HUG" ? "AUTO" : "FIXED";
@@ -5189,23 +5512,26 @@ svg {
         type: "number",
         value: String(value),
         min: 0,
-        max: 240,
+        max: spacingMax,
         "aria-label": label,
         onInput: (event) => {
           const nextValue = Number(event.currentTarget.value);
           if (Number.isFinite(nextValue)) {
-            onChange(Math.min(240, Math.max(0, nextValue)));
+            onChange(Math.min(spacingMax, Math.max(0, nextValue)));
           }
         },
         class: "h-full min-h-8 w-full rounded border border-white/80 bg-white/90 px-1 text-center text-xs font-bold text-gray-900 outline-none transition focus:border-[#0f766e] focus:ring-2 focus:ring-[#0f766e]/10"
       }
     ));
   }
+  var spacingMax;
   var init_FlexLayoutPanel = __esm({
     "src/components/FlexLayoutPanel.tsx"() {
       "use strict";
       init_preact_module();
+      init_hooks_module();
       init_editorModel();
+      spacingMax = 1e4;
     }
   });
 
@@ -5481,6 +5807,7 @@ svg {
         FlexLayoutPanel,
         {
           node: selectedNode,
+          parentNode: selectedParentNode,
           parentLayoutMode: selectedParentLayoutMode,
           onChange: (nextNode) => {
             const directionChanged = didLayoutDirectionChange(selectedNode, nextNode);
@@ -7542,6 +7869,7 @@ svg {
     const [frameSource, setFrameSource] = d2(null);
     const [importError, setImportError] = d2("");
     const [targetDevice, setTargetDevice] = d2("mobile");
+    const [customScale, setCustomScale] = d2(1);
     const [layoutRules, setLayoutRules] = d2(defaultLayoutRules);
     const [exportSnapshot, setExportSnapshot] = d2(null);
     const [isExportPanelOpen, setIsExportPanelOpen] = d2(false);
@@ -7590,17 +7918,26 @@ svg {
       syncExportSnapshotFrame(nextFrame);
     }
     function syncExportSnapshotFrame(nextFrame) {
-      const importedWidth = getImportedFrameWidth(nextFrame);
-      setExportSnapshot((currentSnapshot) => currentSnapshot == null ? null : __spreadProps(__spreadValues({}, currentSnapshot), {
-        settings: __spreadProps(__spreadValues({}, currentSnapshot.settings), {
-          sourceWidth: importedWidth,
-          screenWidth: getTargetDeviceWidth(currentSnapshot.settings.targetDevice, importedWidth)
-        }),
-        frame: cloneFrame(nextFrame)
-      }));
+      const importedWidth = getImportedFrameWidth2(nextFrame);
+      setExportSnapshot((currentSnapshot) => {
+        var _a;
+        return currentSnapshot == null ? null : __spreadProps(__spreadValues({}, currentSnapshot), {
+          settings: __spreadProps(__spreadValues({}, currentSnapshot.settings), {
+            sourceWidth: importedWidth,
+            screenWidth: getTargetDeviceWidth(
+              currentSnapshot.settings.targetDevice,
+              importedWidth,
+              (_a = currentSnapshot.settings.customScale) != null ? _a : customScale
+            )
+          }),
+          frame: cloneFrame(nextFrame)
+        });
+      });
     }
     function handleGenerate(settings) {
+      var _a;
       setTargetDevice(settings.targetDevice);
+      setCustomScale((_a = settings.customScale) != null ? _a : customScale);
       setLayoutRules(settings.layoutRules);
       if (workingFrame == null) {
         return;
@@ -7614,21 +7951,23 @@ svg {
       setIsExportPanelOpen(true);
     }
     function importJson(value) {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e;
       const result = parseJsonImport(value);
       if ("error" in result) {
         setJsonImportError(result.error);
         return false;
       }
       const nextTargetDevice = (_a = result.targetDevice) != null ? _a : targetDevice;
-      const importedWidth = getImportedFrameWidth(result.frame);
-      const referenceWidth = getTargetDeviceWidth(nextTargetDevice, importedWidth);
-      const nextLayoutRules = (_b = result.layoutRules) != null ? _b : layoutRules;
-      const nextOptions = (_c = result.options) != null ? _c : createDefaultConversionOptions();
+      const importedWidth = getImportedFrameWidth2(result.frame);
+      const nextCustomScale = nextTargetDevice === "custom" ? (_b = result.customScale) != null ? _b : customScale : 1;
+      const referenceWidth = getTargetDeviceWidth(nextTargetDevice, importedWidth, nextCustomScale);
+      const nextLayoutRules = (_c = result.layoutRules) != null ? _c : layoutRules;
+      const nextOptions = (_d = result.options) != null ? _d : createDefaultConversionOptions();
       const settings = {
         targetDevice: nextTargetDevice,
         sourceWidth: importedWidth,
         screenWidth: referenceWidth,
+        customScale: nextTargetDevice === "custom" ? nextCustomScale : void 0,
         sourceFrame: null,
         layoutRules: nextLayoutRules,
         options: nextOptions
@@ -7641,10 +7980,11 @@ svg {
       setUndoStack([]);
       setRedoStack([]);
       setTargetDevice(nextTargetDevice);
+      setCustomScale(nextCustomScale);
       setLayoutRules(nextLayoutRules);
       setExportSnapshot({
         id: `json-import-${Date.now()}`,
-        appliedAt: (_d = result.appliedAt) != null ? _d : (/* @__PURE__ */ new Date()).toISOString(),
+        appliedAt: (_e = result.appliedAt) != null ? _e : (/* @__PURE__ */ new Date()).toISOString(),
         settings,
         frame: cloneFrame(result.frame)
       });
@@ -7687,8 +8027,10 @@ svg {
         jsonImportError,
         isJsonImportedFrame: frameSource === "json",
         targetDevice,
+        customScale,
         layoutRules,
         onTargetDeviceChange: setTargetDevice,
+        onCustomScaleChange: setCustomScale,
         onLayoutRulesChange: setLayoutRules,
         onClearFrame: clearImportedFrame,
         onImportJson: importJson,
@@ -7700,7 +8042,7 @@ svg {
         sourceFrame: importedFrame,
         frame: workingFrame,
         targetDevice,
-        screenWidth: getTargetDeviceWidth(targetDevice, getImportedFrameWidth(importedFrame)),
+        screenWidth: getTargetDeviceWidth(targetDevice, getImportedFrameWidth2(importedFrame), customScale),
         layoutRules,
         canUndo: undoStack.length > 0,
         canRedo: redoStack.length > 0,
@@ -7718,7 +8060,7 @@ svg {
     ));
   }
   function parseJsonImport(value) {
-    var _a, _b;
+    var _a, _b, _c;
     let parsed;
     try {
       parsed = JSON.parse(value);
@@ -7745,8 +8087,9 @@ svg {
       frame: denormalizeFigmaJson(frameResult.value),
       appliedAt: readString(root.appliedAt),
       targetDevice: readTargetDevice((_a = settings == null ? void 0 : settings.targetDevice) != null ? _a : target == null ? void 0 : target.device),
+      customScale: readOptionalBoundedNumber((_b = settings == null ? void 0 : settings.customScale) != null ? _b : target == null ? void 0 : target.scale, 0.25, 2),
       layoutRules: readLayoutRules(settings == null ? void 0 : settings.layoutRules),
-      options: readConversionOptions((_b = settings == null ? void 0 : settings.options) != null ? _b : root.appliedOptions)
+      options: readConversionOptions((_c = settings == null ? void 0 : settings.options) != null ? _c : root.appliedOptions)
     };
   }
   function cloneFrame(frame) {
@@ -7755,7 +8098,7 @@ svg {
   function trimHistory(stack) {
     return stack.length > historyLimit ? stack.slice(stack.length - historyLimit) : stack;
   }
-  function getImportedFrameWidth(frame) {
+  function getImportedFrameWidth2(frame) {
     if (frame == null) {
       return 1;
     }
@@ -7837,6 +8180,9 @@ svg {
   }
   function readBoundedNumber(value, fallback, min, max) {
     return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+  }
+  function readOptionalBoundedNumber(value, min, max) {
+    return typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : void 0;
   }
   function readString(value) {
     return typeof value === "string" ? value : void 0;
