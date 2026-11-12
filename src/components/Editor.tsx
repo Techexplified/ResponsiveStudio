@@ -60,6 +60,9 @@ export default function Editor({
           <p class="mt-2 text-sm leading-6 text-gray-500">
             Import a Figma frame to inspect and convert its responsive layout.
           </p>
+          <p class="mt-2 text-xs font-semibold leading-5 text-gray-500">
+            The selected frame should use Auto Layout for reliable responsive conversion.
+          </p>
         </div>
       </section>
     )

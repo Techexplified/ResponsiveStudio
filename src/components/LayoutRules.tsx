@@ -4,7 +4,7 @@ import type { ComponentChildren } from "preact"
 export type LayoutConversionDirection = "row-to-column" | "column-to-row"
 export type RowToColumnMode = "auto" | "always" | "never"
 export type StackAlignment = "start" | "center" | "stretch"
-export type TextScaleMode = "preserve" | "scale" | "clamp"
+export type TextScaleMode = "preserve" | "scale"
 
 export type LayoutRulesState = {
   conversionDirection: LayoutConversionDirection
@@ -25,7 +25,7 @@ export const defaultLayoutRules: LayoutRulesState = {
   stackGap: 16,
   outputPadding: 16,
   stackAlignment: "stretch",
-  textScaleMode: "clamp",
+  textScaleMode: "scale",
   minimumTextSize: 12,
   tightenLineHeight: true
 }
@@ -140,8 +140,7 @@ export default function LayoutRules({ value, onChange }: LayoutRulesProps) {
         value={value.textScaleMode}
         options={[
           { value: "preserve", label: "Keep" },
-          { value: "scale", label: "Scale" },
-          { value: "clamp", label: "Clamp" }
+          { value: "scale", label: "Scale" }
         ]}
         onChange={(textScaleMode) => update({ textScaleMode })}
       />
@@ -245,7 +244,7 @@ function ControlGroup({
 function SegmentedControl<T extends string>({
   value,
   options,
-  columns = 3,
+  columns,
   onChange
 }: {
   value: T
@@ -256,9 +255,11 @@ function SegmentedControl<T extends string>({
   columns?: 2 | 3
   onChange: (value: T) => void
 }) {
+  const columnCount = columns ?? (options.length === 2 ? 2 : 3)
+
   return (
     <div class={`grid gap-1.5 rounded-2xl border border-[#cbd5e1] bg-[#e2e8f0] p-1.5 ${
-      columns === 2 ? "grid-cols-2" : "grid-cols-3"
+      columnCount === 2 ? "grid-cols-2" : "grid-cols-3"
     }`}>
       {options.map((option) => {
         const isSelected = option.value === value

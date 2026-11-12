@@ -253,6 +253,12 @@ function materializeExportPreviewFrame(payload: JsonExportPayload): FigmaSeriali
   const reviewWidth = Number.isFinite(payload.screenWidth) && payload.screenWidth > 0
     ? payload.screenWidth
     : payload.frame.geometry.width
+  const rootAutoLayoutFrame = materializeRootJsonExportFrame(payload.frame, reviewWidth, payload.layoutRules)
+
+  if (rootAutoLayoutFrame != null) {
+    return rootAutoLayoutFrame
+  }
+
   const exportGroups = createJsonExportReviewGroups(payload.frame, reviewWidth, payload.layoutRules)
   const reviewHeight = Math.max(
     Math.min(payload.frame.geometry.height, 760),
@@ -284,6 +290,37 @@ function materializeExportPreviewFrame(payload: JsonExportPayload): FigmaSeriali
     type: payload.frame.type,
     schemaVersion: 1,
     importedAt: payload.frame.importedAt
+  }
+}
+
+function materializeRootJsonExportFrame(
+  frame: FigmaSerializedFrame,
+  reviewWidth: number,
+  layoutRules: JsonExportLayoutRules
+): FigmaSerializedFrame | null {
+  if (getNativeJsonExportLayoutMode(frame) == null) {
+    return null
+  }
+
+  const scale = reviewWidth / Math.max(frame.geometry.width, 1)
+  const height = Math.max(1, getJsonExportNodeHeight(frame, layoutRules, reviewWidth) * scale)
+  const root = materializeJsonExportNode({
+    node: frame,
+    origin: frame.geometry,
+    scale,
+    layoutRules,
+    reviewWidth,
+    x: 0,
+    y: 0,
+    width: reviewWidth,
+    height
+  })
+
+  return {
+    ...root,
+    type: frame.type,
+    schemaVersion: frame.schemaVersion,
+    importedAt: frame.importedAt
   }
 }
 
@@ -387,7 +424,7 @@ function materializeJsonExportNode({
   return withSerializedGeometry(
     {
       ...node,
-      layout: getStaticSerializedLayout(node),
+      layout: getMaterializedSerializedLayout(node),
       style,
       text,
       children: arrangedChildren
@@ -560,7 +597,7 @@ function arrangeJsonExportChildrenVertically(
     const childWidth = shouldFillJsonExportAxis(
       child,
       "horizontal",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      effectiveRules.stackAlignment === "stretch",
       "VERTICAL",
       sourceParentLayoutMode
     )
@@ -641,7 +678,7 @@ function arrangeJsonExportChildrenHorizontally(
     childHeight: shouldFillJsonExportAxis(
       child,
       "vertical",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      effectiveRules.stackAlignment === "stretch",
       "HORIZONTAL",
       sourceParentLayoutMode
     )
@@ -848,7 +885,7 @@ function getJsonExportFontSize(
     return Math.max(layoutRules.minimumTextSize, scaledSize)
   }
 
-  return Math.max(layoutRules.minimumTextSize, Math.min(fontSize, scaledSize))
+  return Math.max(layoutRules.minimumTextSize, scaledSize)
 }
 
 function scaleJsonExportLineHeight(lineHeight: FigmaJsonValue | undefined, scale: number): FigmaJsonValue | undefined {
@@ -936,6 +973,14 @@ function getStaticSerializedLayout(node: FigmaSerializedNode): FigmaSerializedNo
     layoutGrow: 0,
     layoutSizingHorizontal: "FIXED",
     layoutSizingVertical: "FIXED"
+  }
+}
+
+function getMaterializedSerializedLayout(node: FigmaSerializedNode): FigmaSerializedNode["layout"] {
+  return {
+    ...getStaticSerializedLayout(node),
+    primaryAxisSizingMode: "FIXED",
+    counterAxisSizingMode: "FIXED"
   }
 }
 
@@ -1419,8 +1464,6 @@ async function applyResponsiveTextRules(node: TextNode, payload: GenerationPaylo
 
   if (payload.layoutRules.textScaleMode === "scale") {
     node.fontSize = Math.max(minimumTextSize, scaledSize)
-  } else if (payload.layoutRules.textScaleMode === "clamp") {
-    node.fontSize = Math.max(minimumTextSize, Math.min(node.fontSize, scaledSize))
   }
 
   if (payload.layoutRules.tightenLineHeight && node.lineHeight !== figma.mixed) {
@@ -2056,31 +2099,10 @@ function axisMatchesCrossAxis(
 
 function getSourceAxisForTargetAxis(
   axis: "horizontal" | "vertical",
-  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
-  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
+  _parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
+  _sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
 ): "horizontal" | "vertical" {
-  if (
-    parentLayoutMode == null ||
-    sourceParentLayoutMode == null ||
-    parentLayoutMode === sourceParentLayoutMode
-  ) {
-    return axis
-  }
-
-  return axisMatchesPrimaryParentAxis(parentLayoutMode, axis)
-    ? getParentAxis(sourceParentLayoutMode, "primary")
-    : getParentAxis(sourceParentLayoutMode, "cross")
-}
-
-function getParentAxis(
-  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
-  role: "primary" | "cross"
-): "horizontal" | "vertical" {
-  if (role === "primary") {
-    return parentLayoutMode === "HORIZONTAL" ? "horizontal" : "vertical"
-  }
-
-  return parentLayoutMode === "HORIZONTAL" ? "vertical" : "horizontal"
+  return axis
 }
 
 function isSceneStretchedOnAxis(

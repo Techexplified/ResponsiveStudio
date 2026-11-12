@@ -398,7 +398,7 @@ function readStackAlignment(value: unknown): LayoutRulesState["stackAlignment"] 
 }
 
 function readTextScaleMode(value: unknown): LayoutRulesState["textScaleMode"] {
-  if (value === "preserve" || value === "scale" || value === "clamp") {
+  if (value === "preserve" || value === "scale") {
     return value
   }
 

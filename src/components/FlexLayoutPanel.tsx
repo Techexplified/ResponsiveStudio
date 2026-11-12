@@ -612,12 +612,12 @@ function normalizeChildForParentDirection(
 ): FigmaSerializedNode {
   const widthSizing = getChildAxisSizingForParent(
     child,
-    getSourceAxisForTargetAxis("horizontal", nextParentLayoutMode, currentParentLayoutMode),
+    "horizontal",
     currentParentLayoutMode
   )
   const heightSizing = getChildAxisSizingForParent(
     child,
-    getSourceAxisForTargetAxis("vertical", nextParentLayoutMode, currentParentLayoutMode),
+    "vertical",
     currentParentLayoutMode
   )
 
@@ -700,31 +700,6 @@ function axisMatchesCrossAxis(
   return axis === "horizontal"
     ? parentLayoutMode === "VERTICAL"
     : parentLayoutMode === "HORIZONTAL"
-}
-
-function getSourceAxisForTargetAxis(
-  axis: "horizontal" | "vertical",
-  targetParentLayoutMode: Direction,
-  sourceParentLayoutMode: Direction
-): "horizontal" | "vertical" {
-  if (targetParentLayoutMode === sourceParentLayoutMode) {
-    return axis
-  }
-
-  return axisMatchesPrimaryParentAxis(targetParentLayoutMode, axis)
-    ? getParentAxis(sourceParentLayoutMode, "primary")
-    : getParentAxis(sourceParentLayoutMode, "cross")
-}
-
-function getParentAxis(
-  parentLayoutMode: Direction,
-  role: "primary" | "cross"
-): "horizontal" | "vertical" {
-  if (role === "primary") {
-    return parentLayoutMode === "HORIZONTAL" ? "horizontal" : "vertical"
-  }
-
-  return parentLayoutMode === "HORIZONTAL" ? "vertical" : "horizontal"
 }
 
 function clampDimension(value: number): number {

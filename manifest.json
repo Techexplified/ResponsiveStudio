@@ -3,8 +3,10 @@
   "editorType": [
     "figma"
   ],
-  "id": "Responsive Design",
-  "name": "Responsive Design",
+  "id": "1646581786950907136",
+  "name": "Responsive Studio",
   "main": "build/main.js",
-  "ui": "build/ui.js"
+  "ui": "build/ui.js",
+  "networkAccess": { "allowedDomains": ["none"] },
+  "documentAccess": "dynamic-page"
 }

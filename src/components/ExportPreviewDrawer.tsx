@@ -907,6 +907,21 @@ function createExportReviewGroups(frame: FigmaSerializedFrame, reviewWidth: numb
     }]
   }
 
+  if (getNativeLayoutMode(frame) != null) {
+    const fitScale = reviewWidth / Math.max(frame.geometry.width, 1)
+    const height = Math.max(1, getResponsiveNodeHeight(frame, layoutRules, reviewWidth) * fitScale)
+
+    return [{
+      node: frame,
+      x: 0,
+      y: 0,
+      width: reviewWidth,
+      height,
+      sourceBounds: frame.geometry,
+      scale: fitScale
+    }]
+  }
+
   const contentWidth = Math.max(1, reviewWidth - outerPadding * 2)
   const visibleChildren = frame.children
     .filter((child) => child.visible)
@@ -990,7 +1005,7 @@ function arrangeChildrenVertically(
     const childWidth = shouldFillAxis(
       child,
       "horizontal",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      effectiveRules.stackAlignment === "stretch",
       "VERTICAL",
       sourceParentLayoutMode
     )
@@ -1076,7 +1091,7 @@ function arrangeChildrenHorizontally(
     childHeight: shouldFillAxis(
       child,
       "vertical",
-      effectiveRules.stackAlignment === "stretch" || child.layout.layoutAlign === "STRETCH",
+      effectiveRules.stackAlignment === "stretch",
       "HORIZONTAL",
       sourceParentLayoutMode
     )
@@ -1313,31 +1328,10 @@ function getNodeAxisSizing(
 
 function getSourceAxisForTargetAxis(
   axis: "horizontal" | "vertical",
-  parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
-  sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
+  _parentLayoutMode: "HORIZONTAL" | "VERTICAL" | null,
+  _sourceParentLayoutMode: "HORIZONTAL" | "VERTICAL" | null
 ): "horizontal" | "vertical" {
-  if (
-    parentLayoutMode == null ||
-    sourceParentLayoutMode == null ||
-    parentLayoutMode === sourceParentLayoutMode
-  ) {
-    return axis
-  }
-
-  return axisMatchesPrimaryParentAxis(parentLayoutMode, axis)
-    ? getParentAxis(sourceParentLayoutMode, "primary")
-    : getParentAxis(sourceParentLayoutMode, "cross")
-}
-
-function getParentAxis(
-  parentLayoutMode: "HORIZONTAL" | "VERTICAL",
-  role: "primary" | "cross"
-): "horizontal" | "vertical" {
-  if (role === "primary") {
-    return parentLayoutMode === "HORIZONTAL" ? "horizontal" : "vertical"
-  }
-
-  return parentLayoutMode === "HORIZONTAL" ? "vertical" : "horizontal"
+  return axis
 }
 
 function axisMatchesPrimaryAxis(node: FigmaSerializedNode, axis: "horizontal" | "vertical"): boolean {
@@ -1404,7 +1398,7 @@ function getResponsiveFontSize(
     return Math.max(layoutRules.minimumTextSize, scaledSize)
   }
 
-  return Math.max(layoutRules.minimumTextSize, Math.min(fontSize, scaledSize))
+  return Math.max(layoutRules.minimumTextSize, scaledSize)
 }
 
 function getDeviceLabel(targetDevice: TargetDevice): string {

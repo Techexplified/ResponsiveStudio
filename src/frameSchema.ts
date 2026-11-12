@@ -295,7 +295,7 @@ export type UiToPluginMessage =
           stackGap: number
           outputPadding: number
           stackAlignment: ResponsiveStackAlignment
-          textScaleMode: "preserve" | "scale" | "clamp"
+          textScaleMode: "preserve" | "scale"
           minimumTextSize: number
           tightenLineHeight: boolean
         }
@@ -319,7 +319,7 @@ export type UiToPluginMessage =
           stackGap: number
           outputPadding: number
           stackAlignment: ResponsiveStackAlignment
-          textScaleMode: "preserve" | "scale" | "clamp"
+          textScaleMode: "preserve" | "scale"
           minimumTextSize: number
           tightenLineHeight: boolean
         }
